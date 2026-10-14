@@ -1,0 +1,15 @@
+services:
+  psicometric-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - PORT=8000
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - SPREADSHEET_ID=${SPREADSHEET_ID}
+      - GOOGLE_CREDENTIALS_JSON=${GOOGLE_CREDENTIALS_JSON:-}
+    env_file:
+      - ./backend/.env
+    restart: unless-stopped
