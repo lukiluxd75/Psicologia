@@ -4,6 +4,7 @@ import { OcrUploader } from "./components/OcrUploader";
 import { AuditResultView } from "./components/AuditResultView";
 import { BriefResultView } from "./components/BriefResultView";
 import { PassResultView } from "./components/PassResultView";
+import { PsicosocialResultView } from "./components/PsicosocialResultView";
 import { HistorialView } from "./components/HistorialView";
 import { useHistorial } from "./hooks/useHistorial";
 
@@ -12,20 +13,25 @@ export function App() {
   const [resultadoAudit, setResultadoAudit] = useState<any>(null);
   const [resultadoBrief, setResultadoBrief] = useState<any>(null);
   const [resultadoPass, setResultadoPass] = useState<any>(null);
+  const [resultadoPsicosocial, setResultadoPsicosocial] = useState<any>(null);
 
   const {
     historialAudit,
     historialBrief,
     historialPass,
+    historialPsicosocial,
     agregarAudit,
     agregarBrief,
     agregarPass,
+    agregarPsicosocial,
     eliminarAudit,
     eliminarBrief,
     eliminarPass,
+    eliminarPsicosocial,
     limpiarAudit,
     limpiarBrief,
     limpiarPass,
+    limpiarPsicosocial,
   } = useHistorial();
 
   const handleResultadoAudit = (res: any) => {
@@ -46,14 +52,24 @@ export function App() {
     agregarPass(res);
   };
 
+  const handleResultadoPsicosocial = (res: any) => {
+    limpiarResultados();
+    setResultadoPsicosocial(res);
+    agregarPsicosocial(res);
+  };
+
   const limpiarResultados = () => {
     setResultadoAudit(null);
     setResultadoBrief(null);
     setResultadoPass(null);
+    setResultadoPsicosocial(null);
   };
 
   const totalHistorial =
-    historialAudit.length + historialBrief.length + historialPass.length;
+    historialAudit.length +
+    historialBrief.length +
+    historialPass.length +
+    historialPsicosocial.length;
 
   return (
     <div className="min-h-screen bg-slate-50/70 text-slate-800 flex flex-col font-sans">
@@ -78,12 +94,15 @@ export function App() {
             historialAudit={historialAudit}
             historialBrief={historialBrief}
             historialPass={historialPass}
+            historialPsicosocial={historialPsicosocial}
             eliminarAudit={eliminarAudit}
             eliminarBrief={eliminarBrief}
             eliminarPass={eliminarPass}
+            eliminarPsicosocial={eliminarPsicosocial}
             limpiarAudit={limpiarAudit}
             limpiarBrief={limpiarBrief}
             limpiarPass={limpiarPass}
+            limpiarPsicosocial={limpiarPsicosocial}
           />
         )}
 
@@ -100,17 +119,26 @@ export function App() {
           <PassResultView data={resultadoPass} onReset={limpiarResultados} />
         )}
 
+        {tabActiva !== "historial" && resultadoPsicosocial && (
+          <PsicosocialResultView
+            data={resultadoPsicosocial}
+            onReset={limpiarResultados}
+          />
+        )}
+
         {/* Módulos según la pestaña activa cuando no hay resultados en pantalla */}
         {tabActiva !== "historial" &&
           !resultadoAudit &&
           !resultadoBrief &&
-          !resultadoPass && (
+          !resultadoPass &&
+          !resultadoPsicosocial && (
             <>
               {tabActiva === "ocr" && (
                 <OcrUploader
                   onResultadoAudit={handleResultadoAudit}
                   onResultadoBrief={handleResultadoBrief}
                   onResultadoPass={handleResultadoPass}
+                  onResultadoPsicosocial={handleResultadoPsicosocial}
                 />
               )}
             </>

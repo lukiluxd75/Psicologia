@@ -53,6 +53,19 @@ PASS_HEADERS = [
     "Puntaje Global (0-93)", "Severidad", "Nivel de Riesgo (Corte 26)", "Alerta Fobia (Ítem 7)"
 ]
 
+PSICOSOCIAL_HEADERS = [
+    "Nombre", "Fecha", "Edad", "Ocupación", "Grado Instrucción", "Estado Civil",
+    "Zona Vivienda", "Semanas Gestación", "Hijos Anteriores", "Recibe Subsidio",
+    "Embarazo Planificado", "Pérdida Significativa",
+    "A. Relación Pareja (6-30)", "Nivel Pareja",
+    "B. Apoyo Familiar (6-30)", "Nivel Familia",
+    "C. Red Apoyo Social (5-25)", "Nivel Red Social",
+    "D. Integración Entorno (5-25)", "Nivel Entorno",
+    "E. Situación Económica (5-25)", "Nivel Economía",
+    "G. Vivencia Embarazo (5-25)", "Nivel Vivencia",
+    "Puntaje Global (32-160)"
+]
+
 def _obtener_o_crear_hoja(documento, tipo_test: str):
     try:
         return documento.worksheet(tipo_test)
@@ -63,6 +76,8 @@ def _obtener_o_crear_hoja(documento, tipo_test: str):
             headers = BRIEF_HEADERS
         elif tipo_test == "PASS":
             headers = PASS_HEADERS
+        elif tipo_test == "PSICOSOCIAL":
+            headers = PSICOSOCIAL_HEADERS
         else:
             headers = ["Datos"]
         nueva_hoja = documento.add_worksheet(title=tipo_test, rows=200, cols=max(len(headers) + 2, 20))

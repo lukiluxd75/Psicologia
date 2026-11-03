@@ -184,3 +184,145 @@ async def extraer_datos_pass_multiple(files: List[UploadFile]) -> dict:
     datos["respuestas"] = respuestas
 
     return datos
+
+
+async def extraer_datos_psicosocial_multiple(files: List[UploadFile]) -> dict:
+    """
+    Lee de 1 a 8 archivos (imágenes o PDF) del Cuestionario Sociodemográfico y Psicosocial en Mujeres Gestantes.
+    Extrae los datos sociodemográficos (ítems 1 al 10) y las respuestas Likert (11-37 y 43-47).
+    """
+    archivos_gemini = []
+    for file in files:
+        file_bytes = await file.read()
+        ct = (file.content_type or "").lower()
+        fn = (file.filename or "").lower()
+        if "pdf" in ct or fn.endswith(".pdf"):
+            mime = "application/pdf"
+        elif "png" in ct or fn.endswith(".png"):
+            mime = "image/png"
+        elif "webp" in ct or fn.endswith(".webp"):
+            mime = "image/webp"
+        else:
+            mime = "image/jpeg"
+
+        archivos_gemini.append({
+            "mime_type": mime,
+            "data": file_bytes
+        })
+
+    prompt = """
+    Eres un asistente clínico experto en extracción de datos psicométricos y médicos.
+    Analiza los documentos/imágenes adjuntos que corresponden al:
+    "CUESTIONARIO SOCIODEMOGRÁFICO Y DE FACTORES PSICOSOCIALES EN MUJERES GESTANTES".
+
+    Extrae con extrema precisión los siguientes datos y devuelve ÚNICAMENTE un objeto JSON válido, sin formato markdown ni texto adicional:
+
+    ESTRUCTURA EXACTA DEL JSON:
+    {
+      "sociodemografico": {
+        "nombre": "Nombre completo o 'Anónima / No especificado'",
+        "fecha": "Fecha de aplicación o ''",
+        "edad": 25,
+        "ocupacion": "Ama de casa",
+        "grado_instruccion": "Secundaria",
+        "estado_civil": "Concubinato / unión libre",
+        "zona_vivienda": "Zona Sur",
+        "semanas_gestacion": 28,
+        "hijos_anteriores": "Ninguno",
+        "recibe_subsidio": "Sí",
+        "embarazo_planificado": "Sí",
+        "perdida_significativa": "No"
+      },
+      "respuestas": {
+        "11": 4, "12": 4, "13": 3, "14": 4, "15": 3, "16": 4,
+        "17": 5, "18": 4, "19": 4, "20": 4, "21": 3, "22": 4,
+        "23": 3, "24": 4, "25": 3, "26": 4, "27": 3,
+        "28": 3, "29": 2, "30": 3, "31": 3, "32": 4,
+        "33": 3, "34": 3, "35": 2, "36": 3, "37": 3,
+        "43": 4, "44": 5, "45": 4, "46": 4, "47": 4
+      }
+    }
+
+    REGLAS CLÍNICAS Y DE EXTRACCIÓN:
+    1. Datos sociodemográficos (Ítems 1 al 10):
+       - "nombre": Si está vacío o ilegible, pon "Anónima / No especificado".
+       - "fecha": Fecha anotada en el documento.
+       - "edad": Número entero en años (ej. 24). Si no figura, pon 0.
+       - "semanas_gestacion": Número entero de semanas (ej. 32). Si no figura, pon 0.
+       - "ocupacion": "Ama de casa", "Estudiante", "Trabajadora independiente", "Trabajadora dependiente", "Comerciante", "Profesional", u "Otra: ...".
+       - "grado_instruccion": "Sin estudios", "Primaria", "Secundaria", "Técnico medio", "Técnico superior", o "Universitario".
+       - "estado_civil": "Soltera", "Casada", "Concubinato / unión libre", "Divorciada", "Separada", o "Viuda".
+       - "zona_vivienda": "Zona Sur", "Cercado", "La Cancha (zona del mercado)", "Av. Petrolera, Villa Coronilla", "Lacma, Pacata, Guadalquivir", u "Otra: ...".
+       - "hijos_anteriores": "Ninguno", "1", "2", "3", o "4 o más".
+       - "recibe_subsidio": "Sí", "No", o "No sabe / no está segura".
+       - "embarazo_planificado": "Sí", "No", o "Parcialmente / no estaba segura".
+       - "perdida_significativa": "Sí" o "No".
+    2. Escalas Likert (Ítems 11 al 37 y 43 al 47):
+       - Cada ítem evalúa del 1 al 5 según la columna marcada:
+         1 = Nunca, 2 = Casi nunca, 3 = Algunas veces, 4 = Casi siempre, 5 = Siempre.
+       - A. Relación de Pareja: Ítems 11 al 16.
+       - B. Apoyo y Relaciones Familiares: Ítems 17 al 22.
+       - C. Amistades y Red de Apoyo Social: Ítems 23 al 27.
+       - D. Participación e Integración en el Entorno: Ítems 28 al 32.
+       - E. Situación Económica: Ítems 33 al 37.
+       - G. Planificación y Vivencia del Embarazo: Ítems 43 al 47. (Nota: en el formulario no hay ítems 38-42).
+       - REGLA DE CORRECCIÓN: Si hay una casilla tachada o con 'X' y otra marcada limpiamente, toma únicamente la válida.
+       - Si algún ítem no tiene ninguna marca visible o está ilegible, coloca 3.
+    """
+
+    texto_respuesta = _generar_contenido_seguro([prompt, *archivos_gemini])
+    datos = _parsear_json_seguro(texto_respuesta)
+
+    # Validar y normalizar sociodemográfico
+    socio_raw = datos.get("sociodemografico", {})
+    if not isinstance(socio_raw, dict):
+        socio_raw = {}
+
+    try:
+        edad_num = int(socio_raw.get("edad", 0))
+    except (ValueError, TypeError):
+        edad_num = 0
+
+    try:
+        semanas_num = int(socio_raw.get("semanas_gestacion", 0))
+    except (ValueError, TypeError):
+        semanas_num = 0
+
+    socio = {
+        "nombre": str(socio_raw.get("nombre") or "Anónima / No especificado").strip(),
+        "fecha": str(socio_raw.get("fecha") or "").strip(),
+        "edad": max(0, edad_num),
+        "ocupacion": str(socio_raw.get("ocupacion") or "").strip(),
+        "grado_instruccion": str(socio_raw.get("grado_instruccion") or "").strip(),
+        "estado_civil": str(socio_raw.get("estado_civil") or "").strip(),
+        "zona_vivienda": str(socio_raw.get("zona_vivienda") or "").strip(),
+        "semanas_gestacion": max(0, semanas_num),
+        "hijos_anteriores": str(socio_raw.get("hijos_anteriores") or "").strip(),
+        "recibe_subsidio": str(socio_raw.get("recibe_subsidio") or "").strip(),
+        "embarazo_planificado": str(socio_raw.get("embarazo_planificado") or "").strip(),
+        "perdida_significativa": str(socio_raw.get("perdida_significativa") or "").strip(),
+    }
+
+    # Validar y normalizar respuestas de ítems (11..37 y 43..47)
+    resp_raw = datos.get("respuestas", {})
+    if not isinstance(resp_raw, dict):
+        resp_raw = {}
+
+    items_requeridos = [
+        *range(11, 38),  # 11 al 37
+        *range(43, 48),  # 43 al 47
+    ]
+    respuestas_limpias = {}
+    for num in items_requeridos:
+        val = resp_raw.get(str(num), resp_raw.get(num, 3))
+        try:
+            val_int = int(val)
+            val_limpio = max(1, min(5, val_int))
+        except (ValueError, TypeError):
+            val_limpio = 3
+        respuestas_limpias[str(num)] = val_limpio
+
+    return {
+        "sociodemografico": socio,
+        "respuestas": respuestas_limpias
+    }

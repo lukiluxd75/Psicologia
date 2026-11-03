@@ -59,6 +59,12 @@ class SolicitudPassManual(BaseModel):
     guardar_en_sheets: bool = False
 
 
+class SolicitudPsicosocialManual(BaseModel):
+    sociodemografico: dict
+    respuestas: dict
+    guardar_en_sheets: bool = False
+
+
 @app.get("/api/health")
 def health_check():
     return {
@@ -316,6 +322,106 @@ async def procesar_test_pass_manual(payload: SolicitudPassManual):
             "fecha": payload.fecha
         },
         "resultados": resultados
+    }
+
+
+@app.post("/api/upload/psicosocial")
+async def procesar_test_psicosocial_ocr(files: List[UploadFile] = File(...)):
+    if not (1 <= len(files) <= 8):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Se requiere entre 1 y 8 archivos (imágenes o PDF) para el cuestionario PSICOSOCIAL (se recibieron {len(files)})."
+        )
+
+    datos_extraidos = await gemini_service.extraer_datos_psicosocial_multiple(files)
+    socio = datos_extraidos.get("sociodemografico", {})
+    respuestas = datos_extraidos.get("respuestas", {})
+    resultados = scoring_service.procesar_test_psicosocial(respuestas)
+
+    dim = resultados["dimensiones"]
+    fila_excel = [
+        socio.get("nombre", "Anónima / No especificado"),
+        socio.get("fecha", ""),
+        socio.get("edad", 0),
+        socio.get("ocupacion", ""),
+        socio.get("grado_instruccion", ""),
+        socio.get("estado_civil", ""),
+        socio.get("zona_vivienda", ""),
+        socio.get("semanas_gestacion", 0),
+        socio.get("hijos_anteriores", ""),
+        socio.get("recibe_subsidio", ""),
+        socio.get("embarazo_planificado", ""),
+        socio.get("perdida_significativa", ""),
+        dim["relacion_pareja"]["puntaje"],
+        dim["relacion_pareja"]["nivel"],
+        dim["apoyo_familiar"]["puntaje"],
+        dim["apoyo_familiar"]["nivel"],
+        dim["red_apoyo_social"]["puntaje"],
+        dim["red_apoyo_social"]["nivel"],
+        dim["integracion_entorno"]["puntaje"],
+        dim["integracion_entorno"]["nivel"],
+        dim["situacion_economica"]["puntaje"],
+        dim["situacion_economica"]["nivel"],
+        dim["vivencia_embarazo"]["puntaje"],
+        dim["vivencia_embarazo"]["nivel"],
+        resultados["puntaje_global"]
+    ]
+
+    guardado = sheets_service.guardar_resultado_excel("PSICOSOCIAL", fila_excel)
+
+    return {
+        "mensaje": "Test PSICOSOCIAL procesado y guardado correctamente" if guardado else "Test PSICOSOCIAL procesado (Sheets no sincronizado)",
+        "guardado_en_sheets": guardado,
+        "sociodemografico": socio,
+        "resultados": resultados,
+        "respuestas": respuestas
+    }
+
+
+@app.post("/api/test/psicosocial/manual")
+async def procesar_test_psicosocial_manual(payload: SolicitudPsicosocialManual):
+    socio = payload.sociodemografico or {}
+    respuestas = payload.respuestas or {}
+    resultados = scoring_service.procesar_test_psicosocial(respuestas)
+    guardado = False
+
+    if payload.guardar_en_sheets:
+        dim = resultados["dimensiones"]
+        fila_excel = [
+            socio.get("nombre", "Anónima / No especificado"),
+            socio.get("fecha", ""),
+            socio.get("edad", 0),
+            socio.get("ocupacion", ""),
+            socio.get("grado_instruccion", ""),
+            socio.get("estado_civil", ""),
+            socio.get("zona_vivienda", ""),
+            socio.get("semanas_gestacion", 0),
+            socio.get("hijos_anteriores", ""),
+            socio.get("recibe_subsidio", ""),
+            socio.get("embarazo_planificado", ""),
+            socio.get("perdida_significativa", ""),
+            dim["relacion_pareja"]["puntaje"],
+            dim["relacion_pareja"]["nivel"],
+            dim["apoyo_familiar"]["puntaje"],
+            dim["apoyo_familiar"]["nivel"],
+            dim["red_apoyo_social"]["puntaje"],
+            dim["red_apoyo_social"]["nivel"],
+            dim["integracion_entorno"]["puntaje"],
+            dim["integracion_entorno"]["nivel"],
+            dim["situacion_economica"]["puntaje"],
+            dim["situacion_economica"]["nivel"],
+            dim["vivencia_embarazo"]["puntaje"],
+            dim["vivencia_embarazo"]["nivel"],
+            resultados["puntaje_global"]
+        ]
+        guardado = sheets_service.guardar_resultado_excel("PSICOSOCIAL", fila_excel)
+
+    return {
+        "mensaje": "Test PSICOSOCIAL evaluado manualmente",
+        "guardado_en_sheets": guardado,
+        "sociodemografico": socio,
+        "resultados": resultados,
+        "respuestas": respuestas
     }
 
 

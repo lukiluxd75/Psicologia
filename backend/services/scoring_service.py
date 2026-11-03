@@ -167,3 +167,128 @@ def procesar_test_pass(respuestas_paciente: list) -> dict:
         },
         "respuestas": respuestas
     }
+
+
+INTERPRETACIONES_PSICOSOCIAL = {
+    "relacion_pareja": {
+        "titulo": "A. Relación de Pareja",
+        "maximo": 30,
+        "items": [11, 12, 13, 14, 15, 16],
+        "textos": {
+            "Muy bajo": "Refleja un apoyo muy limitado por parte de la pareja.",
+            "Bajo": "Indica un acompañamiento insuficiente ante las necesidades emocionales de la gestante.",
+            "Moderado": "Existe apoyo de la pareja, aunque puede ser irregular en determinadas situaciones.",
+            "Alto": "Se percibe un acompañamiento frecuente y favorable por parte de la pareja.",
+            "Muy alto": "Dispone de una red social sólida, con personas de confianza a quienes puede acudir cuando lo necesita."
+        }
+    },
+    "apoyo_familiar": {
+        "titulo": "B. Apoyo y Relaciones Familiares",
+        "maximo": 30,
+        "items": [17, 18, 19, 20, 21, 22],
+        "textos": {
+            "Muy bajo": "Existe un respaldo familiar muy limitado y poca disponibilidad de acompañamiento emocional.",
+            "Bajo": "El apoyo familiar resulta insuficiente para atender algunas necesidades emocionales o prácticas.",
+            "Moderado": "La gestante cuenta con apoyo familiar, aunque este puede ser irregular o parcial.",
+            "Alto": "Dispone de acompañamiento familiar frecuente y ayuda cuando la necesita.",
+            "Muy alto": "Cuenta con una familia cercana, colaboradora y disponible durante el embarazo."
+        }
+    },
+    "red_apoyo_social": {
+        "titulo": "C. Amistades y Red de Apoyo Social",
+        "maximo": 25,
+        "items": [23, 24, 25, 26, 27],
+        "textos": {
+            "Muy bajo": "Dispone de pocas personas de confianza a quienes recurrir en busca de ayuda.",
+            "Bajo": "Su red social es limitada y el acompañamiento de amistades u otras personas es escaso.",
+            "Moderado": "Cuenta con algunas fuentes de apoyo, aunque su disponibilidad puede variar.",
+            "Alto": "Mantiene vínculos sociales que favorecen el acompañamiento y la comunicación.",
+            "Muy alto": "Dispone de una red de apoyo sólida y de personas de confianza para afrontar dificultades."
+        }
+    },
+    "integracion_entorno": {
+        "titulo": "D. Participación e Integración en el Entorno",
+        "maximo": 25,
+        "items": [28, 29, 30, 31, 32],
+        "textos": {
+            "Muy bajo": "Presenta poca participación en su entorno y escasas oportunidades de integración.",
+            "Bajo": "Mantiene una participación reducida en espacios sociales o comunitarios.",
+            "Moderado": "Se integra en algunos espacios, aunque su participación puede ser ocasional.",
+            "Alto": "Participa frecuentemente en su entorno y mantiene vínculos favorables con otras personas.",
+            "Muy alto": "Presenta una integración activa y cuenta con oportunidades de participación y apoyo en su entorno."
+        }
+    },
+    "situacion_economica": {
+        "titulo": "E. Situación Económica",
+        "maximo": 25,
+        "items": [33, 34, 35, 36, 37],
+        "textos": {
+            "Muy bajo": "Presenta dificultades económicas importantes para cubrir sus necesidades durante el embarazo.",
+            "Bajo": "Sus recursos económicas son limitados y pueden dificultar la atención de algunas necesidades.",
+            "Moderado": "Puede cubrir parte de sus necesidades, aunque mantiene ciertas limitaciones económicas.",
+            "Alto": "Cuenta con recursos generalmente suficientes para atender sus necesidades durante el embarazo.",
+            "Muy alto": "Percibe estabilidad económica y capacidad para cubrir las necesidades evaluadas."
+        }
+    },
+    "vivencia_embarazo": {
+        "titulo": "G. Planificación y Vivencia del Embarazo",
+        "maximo": 25,
+        "items": [43, 44, 45, 46, 47],
+        "textos": {
+            "Muy bajo": "Refleja poca preparación percibida y dificultades para afrontar los cambios del embarazo.",
+            "Bajo": "Presenta dificultades para sentirse preparada y contar con el apoyo necesario durante esta etapa.",
+            "Moderado": "Manifiesta una preparación parcial y dispone de algunos recursos para afrontar el embarazo.",
+            "Alto": "Se siente preparada para los cambios del embarazo y percibe apoyo para asumir esta etapa.",
+            "Muy alto": "Manifiesta una preparación favorable y confianza para afrontar el embarazo y la maternidad."
+        }
+    }
+}
+
+def _clasificar_nivel_30(puntaje: int) -> str:
+    if puntaje <= 10: return "Muy bajo"
+    if puntaje <= 15: return "Bajo"
+    if puntaje <= 20: return "Moderado"
+    if puntaje <= 25: return "Alto"
+    return "Muy alto"
+
+def _clasificar_nivel_25(puntaje: int) -> str:
+    if puntaje <= 8: return "Muy bajo"
+    if puntaje <= 12: return "Bajo"
+    if puntaje <= 16: return "Moderado"
+    if puntaje <= 20: return "Alto"
+    return "Muy alto"
+
+def procesar_test_psicosocial(respuestas_items: dict) -> dict:
+    """
+    respuestas_items: diccionario cuyas claves son los números de ítem ("11".."37", "43".."47")
+    y valores enteros de 1 a 5.
+    """
+    dimensiones_resultado = {}
+    puntaje_global = 0
+    maximo_global = 160  # 30 + 30 + 25 + 25 + 25 + 25
+
+    for clave, config in INTERPRETACIONES_PSICOSOCIAL.items():
+        suma = 0
+        for num_item in config["items"]:
+            val = respuestas_items.get(str(num_item), respuestas_items.get(num_item, 1))
+            try:
+                val_limpio = max(1, min(5, int(val)))
+            except (ValueError, TypeError):
+                val_limpio = 1
+            suma += val_limpio
+
+        nivel = _clasificar_nivel_30(suma) if config["maximo"] == 30 else _clasificar_nivel_25(suma)
+        dimensiones_resultado[clave] = {
+            "titulo": config["titulo"],
+            "puntaje": suma,
+            "maximo": config["maximo"],
+            "nivel": nivel,
+            "interpretacion": config["textos"][nivel]
+        }
+        puntaje_global += suma
+
+    return {
+        "dimensiones": dimensiones_resultado,
+        "puntaje_global": puntaje_global,
+        "maximo_global": maximo_global
+    }

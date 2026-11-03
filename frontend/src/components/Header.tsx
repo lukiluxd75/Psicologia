@@ -55,7 +55,7 @@ export const Header: React.FC<HeaderProps> = ({ tabActiva, setTabActiva, totalHi
                 </span>
               </div>
               <p className="text-xs text-slate-500 mt-0.5">
-                Corrección Psicométrica Automatizada (AUDIT & BRIEF)
+                Corrección Psicométrica Automatizada (AUDIT, BRIEF, PASS & PSICOSOCIAL)
               </p>
             </div>
           </div>
