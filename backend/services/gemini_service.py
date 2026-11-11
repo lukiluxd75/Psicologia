@@ -54,11 +54,47 @@ def _parsear_json_seguro(texto: str) -> dict:
     raise ValueError(f"No se encontró un objeto JSON válido en la respuesta del modelo: {texto[:200]}")
 
 
+# Temperatura 0 y salida JSON forzada: lectura determinística de formularios.
+CONFIG_GENERACION = {"temperature": 0, "response_mime_type": "application/json"}
+
+
+def _a_entero(valor):
+    try:
+        return int(float(str(valor).strip()))
+    except (ValueError, TypeError):
+        return None
+
+
+def _letra_brief(valor):
+    letra = str(valor or "").strip().upper()[:1]
+    return {"N": 1, "A": 2, "F": 3}.get(letra, _a_entero(valor))
+
+
+def _respuestas_por_item(datos: dict, n: int, defecto: int, minimo: int, maximo: int, convertir=_a_entero) -> list:
+    """
+    Devuelve exactamente n respuestas en orden de ítem. Acepta {"items": {"1": v, ...}} (formato pedido)
+    o {"respuestas": [...]} (formato anterior). Un ítem ilegible se reemplaza por `defecto` EN SU POSICIÓN,
+    sin desplazar los siguientes.
+    """
+    items = datos.get("items")
+    if isinstance(items, dict):
+        crudos = [items.get(str(i), items.get(i)) for i in range(1, n + 1)]
+    else:
+        crudos = list(datos.get("respuestas") or [])[:n]
+        crudos += [None] * (n - len(crudos))
+
+    respuestas = []
+    for v in crudos:
+        val = convertir(v)
+        respuestas.append(defecto if val is None else max(minimo, min(maximo, val)))
+    return respuestas
+
+
 def _generar_contenido_seguro(partes) -> str:
     errores = []
     for nombre in MODEL_NAMES:
         try:
-            m = genai.GenerativeModel(nombre)
+            m = genai.GenerativeModel(nombre, generation_config=CONFIG_GENERACION)
             resp = m.generate_content(partes)
             if resp and resp.text:
                 return resp.text
@@ -87,20 +123,15 @@ async def extraer_datos_test(file: UploadFile, tipo_test: str) -> dict:
     1. "nombre": Nombre del paciente.
     2. "genero": "M" o "F".
     3. "edad": Edad en números.
-    4. "respuestas": Un arreglo (array) de exactamente 10 números enteros correspondientes a las respuestas marcadas (0, 1, 2, 3 o 4). Si una respuesta está ilegible, asume 0.
-    Ejemplo de salida exacto: {"nombre": "Juan Perez", "genero": "M", "edad": 25, "respuestas": [0, 1, 2, 0, 3, 1, 0, 2, 1, 0]}
+    4. "items": Un objeto con las claves "1" a "10". Para cada pregunta, lee fila por fila verificando el número de pregunta impreso, y anota el número encerrado en círculo en la columna PUNTAJE de esa fila (0, 1, 2, 3 o 4; en las preguntas 9 y 10 solo existen 0, 2 o 4). Si una respuesta está ilegible, pon null.
+    Formato de salida: {"nombre": "<texto>", "genero": "<M|F>", "edad": <entero>, "items": {"1": <0-4>, "2": <0-4>, ..., "10": <0|2|4>}}
     """
 
     texto_respuesta = _generar_contenido_seguro([prompt, imagen_gemini])
     datos = _parsear_json_seguro(texto_respuesta)
 
-    # Asegurar exactamente 10 respuestas para AUDIT
-    respuestas = [int(r) for r in datos.get("respuestas", []) if isinstance(r, (int, float, str)) and str(r).isdigit()]
-    if len(respuestas) < 10:
-        respuestas = respuestas + [0] * (10 - len(respuestas))
-    elif len(respuestas) > 10:
-        respuestas = respuestas[:10]
-    datos["respuestas"] = respuestas
+    datos["respuestas"] = _respuestas_por_item(datos, 10, defecto=0, minimo=0, maximo=4)
+    datos.pop("items", None)
 
     return datos
 
@@ -125,20 +156,16 @@ async def extraer_datos_brief_multiple(files: List[UploadFile]) -> dict:
     1. "nombre": Nombre del paciente (ubicado en la primera página).
     2. "genero": "M" o "F".
     3. "edad": Edad en números.
-    4. "respuestas": Un arreglo (array) de exactamente 75 números enteros del ítem 1 al 75 convirtiendo la letra encerrada en círculo según esta regla estricta: N = 1, A = 2, F = 3. Si en una fila hay una letra tachada/borroneada y otra encerrada limpiamente en un círculo, toma únicamente la letra limpia. Si una respuesta está ilegible, asume 1.
-    Ejemplo de salida exacto: {"nombre": "Juan Perez", "genero": "M", "edad": 25, "respuestas": [1, 2, 3, 1, 1, 1]}
+    4. "items": Un objeto con las claves "1" a "75". Para CADA fila, identifica cuál letra (N, A o F) está encerrada en un círculo en esa misma fila. Lee fila por fila verificando el número impreso al inicio de la fila. Si en una fila hay una letra tachada/borroneada y otra encerrada limpiamente en un círculo, toma únicamente la letra limpia. Si una respuesta está ilegible, pon null.
+    Formato de salida: {"nombre": "<texto>", "genero": "<M|F>", "edad": <entero>, "items": {"1": "<N|A|F>", "2": "<N|A|F>", ..., "75": "<N|A|F>"}}
     """
 
     texto_respuesta = _generar_contenido_seguro([prompt, *imagenes_gemini])
     datos = _parsear_json_seguro(texto_respuesta)
 
-    # Asegurar exactamente 75 respuestas para BRIEF
-    respuestas = [int(r) for r in datos.get("respuestas", []) if isinstance(r, (int, float, str)) and str(r).isdigit()]
-    if len(respuestas) < 75:
-        respuestas = respuestas + [1] * (75 - len(respuestas))
-    elif len(respuestas) > 75:
-        respuestas = respuestas[:75]
-    datos["respuestas"] = respuestas
+    # N = 1, A = 2, F = 3
+    datos["respuestas"] = _respuestas_por_item(datos, 75, defecto=1, minimo=1, maximo=3, convertir=_letra_brief)
+    datos.pop("items", None)
 
     return datos
 
@@ -166,22 +193,17 @@ async def extraer_datos_pass_multiple(files: List[UploadFile]) -> dict:
     5. "semanas_embarazo": Número entero escrito dentro del paréntesis de "Semanas de embarazo ( )" (ej. 31). Si está vacío, pon 0.
     6. "edad_bebe": Número entero escrito dentro del paréntesis de "Edad del bebé ( )" (ej. 0). Si está vacío, pon 0.
     7. "fecha": Fecha escrita en "FECHA:" (ej. "28/09/26").
-    8. "respuestas": Un arreglo (array) de exactamente 31 números enteros (0, 1, 2 o 3) correspondientes al valor encerrado en círculo en cada fila del ítem 1 al 31 (Nunca=0, Algunas veces=1, A menudo=2, Casi siempre=3).
+    8. "items": Un objeto con las claves "1" a "31" cuyo valor es el número (0, 1, 2 o 3) encerrado en círculo en esa fila (Nunca=0, Algunas veces=1, A menudo=2, Casi siempre=3). Lee fila por fila verificando el número de ítem impreso al inicio de la fila.
     REGLA CRÍTICA PARA TACHONES Y ANULACIONES: Si en una fila hay un número tachado o con una 'X' al lado (por ejemplo, '0' con una 'X' a la derecha) y otro número encerrado limpiamente en un círculo en esa misma fila (ej. '3'), ignora el número tachado/con X y toma ÚNICAMENTE el número válido encerrado en círculo. Si algún ítem (especialmente en la página 2) está completamente en blanco sin ninguna marca, asigna 0.
     Ejemplo de salida:
-    {"nombre": "Faran Miranda", "edad": 21, "ocupacion": "Estudiante, Música", "etapa_perinatal": "Prenatal", "semanas_embarazo": 31, "edad_bebe": 0, "fecha": "28/09/26", "respuestas": [2, 3, 3, 0, 3, 1, 3, 1, 1, 3, 3, 1, 2, 0, 3, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]}
+    {"nombre": "Faran Miranda", "edad": 21, "ocupacion": "Estudiante, Música", "etapa_perinatal": "Prenatal", "semanas_embarazo": 31, "edad_bebe": 0, "fecha": "28/09/26", "items": {"1": <0-3>, "2": <0-3>, ..., "31": <0-3>}}
     """
 
     texto_respuesta = _generar_contenido_seguro([prompt, *imagenes_gemini])
     datos = _parsear_json_seguro(texto_respuesta)
 
-    # Asegurar exactamente 31 respuestas para PASS
-    respuestas = [int(r) for r in datos.get("respuestas", []) if isinstance(r, (int, float, str)) and str(r).isdigit()]
-    if len(respuestas) < 31:
-        respuestas = respuestas + [0] * (31 - len(respuestas))
-    elif len(respuestas) > 31:
-        respuestas = respuestas[:31]
-    datos["respuestas"] = respuestas
+    datos["respuestas"] = _respuestas_por_item(datos, 31, defecto=0, minimo=0, maximo=3)
+    datos.pop("items", None)
 
     return datos
 
@@ -234,12 +256,8 @@ async def extraer_datos_psicosocial_multiple(files: List[UploadFile]) -> dict:
         "perdida_significativa": "No"
       },
       "respuestas": {
-        "11": 4, "12": 4, "13": 3, "14": 4, "15": 3, "16": 4,
-        "17": 5, "18": 4, "19": 4, "20": 4, "21": 3, "22": 4,
-        "23": 3, "24": 4, "25": 3, "26": 4, "27": 3,
-        "28": 3, "29": 2, "30": 3, "31": 3, "32": 4,
-        "33": 3, "34": 3, "35": 2, "36": 3, "37": 3,
-        "43": 4, "44": 5, "45": 4, "46": 4, "47": 4
+        "11": <1-5>, "12": <1-5>, ..., "37": <1-5>,
+        "43": <1-5>, ..., "47": <1-5>
       }
     }
 

@@ -66,27 +66,67 @@ PSICOSOCIAL_HEADERS = [
     "Puntaje Global (32-160)"
 ]
 
+# Respuestas ítem por ítem (para análisis de fiabilidad en Jamovi). Van al final de cada fila.
+ITEMS_POR_TEST = {
+    "AUDIT": list(range(1, 11)),
+    "BRIEF": list(range(1, 76)),
+    "PASS": list(range(1, 32)),
+    "PSICOSOCIAL": [*range(11, 38), *range(43, 48)],
+}
+
+CABECERAS_BASE = {
+    "AUDIT": AUDIT_HEADERS,
+    "BRIEF": BRIEF_HEADERS,
+    "PASS": PASS_HEADERS,
+    "PSICOSOCIAL": PSICOSOCIAL_HEADERS,
+}
+
+
+def cabecera_item(numero: int) -> str:
+    return f"Ítem {numero}"
+
+
+def cabeceras_completas(tipo_test: str) -> list:
+    base = CABECERAS_BASE.get(tipo_test, ["Datos"])
+    return base + [cabecera_item(n) for n in ITEMS_POR_TEST.get(tipo_test, [])]
+
+
+def columnas_items(tipo_test: str, respuestas) -> list:
+    """Respuestas en el orden de ITEMS_POR_TEST. Acepta lista (ítem 1 en índice 0) o dict {"11": 4, ...}."""
+    numeros = ITEMS_POR_TEST.get(tipo_test, [])
+    if isinstance(respuestas, dict):
+        return [respuestas.get(str(n), respuestas.get(n, "")) for n in numeros]
+    lista = list(respuestas or [])
+    return [lista[n - 1] if n - 1 < len(lista) else "" for n in numeros]
+
+
+def _asegurar_cabeceras(hoja, headers: list):
+    """Agrega a la derecha las cabeceras que falten (p. ej. columnas de ítems en hojas antiguas)."""
+    actuales = hoja.row_values(1)
+    if len(actuales) >= len(headers):
+        return
+    if hoja.col_count < len(headers):
+        hoja.add_cols(len(headers) - hoja.col_count)
+    faltantes = headers[len(actuales):]
+    celda = gspread.utils.rowcol_to_a1(1, len(actuales) + 1)
+    hoja.update(values=[faltantes], range_name=celda)
+
+
 def _obtener_o_crear_hoja(documento, tipo_test: str):
+    headers = cabeceras_completas(tipo_test)
     try:
-        return documento.worksheet(tipo_test)
-    except Exception:
-        if tipo_test == "AUDIT":
-            headers = AUDIT_HEADERS
-        elif tipo_test == "BRIEF":
-            headers = BRIEF_HEADERS
-        elif tipo_test == "PASS":
-            headers = PASS_HEADERS
-        elif tipo_test == "PSICOSOCIAL":
-            headers = PSICOSOCIAL_HEADERS
-        else:
-            headers = ["Datos"]
+        hoja = documento.worksheet(tipo_test)
+        _asegurar_cabeceras(hoja, headers)
+        return hoja
+    except gspread.exceptions.WorksheetNotFound:
         nueva_hoja = documento.add_worksheet(title=tipo_test, rows=200, cols=max(len(headers) + 2, 20))
         nueva_hoja.append_row(headers)
         return nueva_hoja
 
-def guardar_resultado_excel(tipo_test: str, datos_fila: list):
+def guardar_resultado_excel(tipo_test: str, datos_fila: list, items=None):
     """
-    Inserta una nueva fila en la pestaña correspondiente (AUDIT o BRIEF).
+    Inserta una nueva fila en la pestaña del test. Si se pasan `items` (respuestas ítem por ítem),
+    se agregan al final, alineados con las cabeceras "Ítem N".
     """
     try:
         if not SPREADSHEET_ID:
@@ -99,9 +139,31 @@ def guardar_resultado_excel(tipo_test: str, datos_fila: list):
         # Selecciona o crea la pestaña (hoja) según el test
         hoja = _obtener_o_crear_hoja(documento, tipo_test)
         
+        fila = list(datos_fila)
+        if items is not None:
+            base = CABECERAS_BASE.get(tipo_test, [])
+            fila += [""] * (len(base) - len(fila))
+            fila += columnas_items(tipo_test, items)
+
         # Inserta la fila al final del documento
-        hoja.append_row(datos_fila)
+        hoja.append_row(fila)
         return True
     except Exception as e:
         print(f"Error al guardar en Sheets: {e}")
         return False
+
+def obtener_registros_hoja(tipo_test: str) -> list[dict]:
+    """
+    Devuelve todas las filas de la pestaña indicada como lista de diccionarios
+    (clave = cabecera de la hoja). Si la pestaña no existe o no hay conexión, devuelve [].
+    """
+    try:
+        if not SPREADSHEET_ID:
+            return []
+        cliente = obtener_cliente_sheets()
+        documento = cliente.open_by_key(SPREADSHEET_ID)
+        hoja = documento.worksheet(tipo_test.upper())
+        return hoja.get_all_records()
+    except Exception as e:
+        print(f"Aviso al leer hoja {tipo_test} en Sheets: {e}")
+        return []

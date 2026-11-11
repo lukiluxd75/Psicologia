@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Header } from "./components/Header";
 import { OcrUploader } from "./components/OcrUploader";
 import { AuditResultView } from "./components/AuditResultView";
@@ -6,6 +6,7 @@ import { BriefResultView } from "./components/BriefResultView";
 import { PassResultView } from "./components/PassResultView";
 import { PsicosocialResultView } from "./components/PsicosocialResultView";
 import { HistorialView } from "./components/HistorialView";
+import { JamoviAnalyticsView } from "./components/JamoviAnalyticsView";
 import { useHistorial } from "./hooks/useHistorial";
 
 export function App() {
@@ -65,6 +66,16 @@ export function App() {
     setResultadoPsicosocial(null);
   };
 
+  const historialLocal = useMemo(
+    () => ({
+      AUDIT: historialAudit,
+      BRIEF: historialBrief,
+      PASS: historialPass,
+      PSICOSOCIAL: historialPsicosocial,
+    }),
+    [historialAudit, historialBrief, historialPass, historialPsicosocial]
+  );
+
   const totalHistorial =
     historialAudit.length +
     historialBrief.length +
@@ -87,7 +98,13 @@ export function App() {
       />
 
       {/* Contenido Principal */}
-      <main className="flex-1 max-w-4xl w-full mx-auto p-4 sm:p-6 space-y-6">
+      <main
+        className={`flex-1 w-full mx-auto p-4 sm:p-6 space-y-6 ${
+          tabActiva === "estadisticas" ? "max-w-6xl" : "max-w-4xl"
+        }`}
+      >
+        {tabActiva === "estadisticas" && <JamoviAnalyticsView historial={historialLocal} />}
+
         {/* Vista de Historial */}
         {tabActiva === "historial" && (
           <HistorialView
@@ -107,19 +124,19 @@ export function App() {
         )}
 
         {/* Visualización de Resultados si existen */}
-        {tabActiva !== "historial" && resultadoAudit && (
+        {tabActiva === "ocr" && resultadoAudit && (
           <AuditResultView data={resultadoAudit} onReset={limpiarResultados} />
         )}
 
-        {tabActiva !== "historial" && resultadoBrief && (
+        {tabActiva === "ocr" && resultadoBrief && (
           <BriefResultView data={resultadoBrief} onReset={limpiarResultados} />
         )}
 
-        {tabActiva !== "historial" && resultadoPass && (
+        {tabActiva === "ocr" && resultadoPass && (
           <PassResultView data={resultadoPass} onReset={limpiarResultados} />
         )}
 
-        {tabActiva !== "historial" && resultadoPsicosocial && (
+        {tabActiva === "ocr" && resultadoPsicosocial && (
           <PsicosocialResultView
             data={resultadoPsicosocial}
             onReset={limpiarResultados}
@@ -127,20 +144,18 @@ export function App() {
         )}
 
         {/* Módulos según la pestaña activa cuando no hay resultados en pantalla */}
-        {tabActiva !== "historial" &&
+        {tabActiva === "ocr" &&
           !resultadoAudit &&
           !resultadoBrief &&
           !resultadoPass &&
           !resultadoPsicosocial && (
             <>
-              {tabActiva === "ocr" && (
-                <OcrUploader
-                  onResultadoAudit={handleResultadoAudit}
-                  onResultadoBrief={handleResultadoBrief}
-                  onResultadoPass={handleResultadoPass}
-                  onResultadoPsicosocial={handleResultadoPsicosocial}
-                />
-              )}
+              <OcrUploader
+                onResultadoAudit={handleResultadoAudit}
+                onResultadoBrief={handleResultadoBrief}
+                onResultadoPass={handleResultadoPass}
+                onResultadoPsicosocial={handleResultadoPsicosocial}
+              />
             </>
           )}
       </main>

@@ -264,6 +264,7 @@ def procesar_test_psicosocial(respuestas_items: dict) -> dict:
     y valores enteros de 1 a 5.
     """
     dimensiones_resultado = {}
+    respuestas_limpias = {}
     puntaje_global = 0
     maximo_global = 160  # 30 + 30 + 25 + 25 + 25 + 25
 
@@ -276,6 +277,7 @@ def procesar_test_psicosocial(respuestas_items: dict) -> dict:
             except (ValueError, TypeError):
                 val_limpio = 1
             suma += val_limpio
+            respuestas_limpias[str(num_item)] = val_limpio
 
         nivel = _clasificar_nivel_30(suma) if config["maximo"] == 30 else _clasificar_nivel_25(suma)
         dimensiones_resultado[clave] = {
@@ -290,5 +292,6 @@ def procesar_test_psicosocial(respuestas_items: dict) -> dict:
     return {
         "dimensiones": dimensiones_resultado,
         "puntaje_global": puntaje_global,
-        "maximo_global": maximo_global
+        "maximo_global": maximo_global,
+        "respuestas": respuestas_limpias
     }

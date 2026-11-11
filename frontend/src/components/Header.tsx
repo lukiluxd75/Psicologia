@@ -134,6 +134,16 @@ export const Header: React.FC<HeaderProps> = ({ tabActiva, setTabActiva, totalHi
               </span>
             )}
           </button>
+          <button
+            onClick={() => setTabActiva("estadisticas")}
+            className={`px-3 py-1.5 rounded-lg flex items-center gap-2 whitespace-nowrap transition-all ${
+              tabActiva === "estadisticas"
+                ? "bg-blue-600 text-white shadow-xs font-semibold"
+                : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+            }`}
+          >
+            <span>📊 Estadísticas / Jamovi</span>
+          </button>
         </nav>
       </div>
     </header>

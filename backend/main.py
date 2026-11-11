@@ -2,12 +2,12 @@ import config  # Carga .env antes que todo
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
-from services import gemini_service, scoring_service, sheets_service
+from services import gemini_service, scoring_service, sheets_service, analytics_service
 from typing import List, Optional
 
 app = FastAPI(title="API Corrector Psicométrico")
 
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 
 # Configuración de CORS para permitir que React (Frontend) se conecte sin bloqueos
 app.add_middleware(
@@ -105,7 +105,7 @@ async def procesar_test_audit(file: UploadFile = File(...)):
     ]
     
     # 5. Guardar en Google Sheets
-    guardado = sheets_service.guardar_resultado_excel("AUDIT", fila_excel)
+    guardado = sheets_service.guardar_resultado_excel("AUDIT", fila_excel, items=respuestas)
     
     return {
         "mensaje": "Test AUDIT procesado y guardado correctamente" if guardado else "Test AUDIT procesado (Sheets no sincronizado)",
@@ -162,7 +162,7 @@ async def procesar_test_brief(files: List[UploadFile] = File(...)):
     ]
     
     # 4. Guardar en Google Sheets
-    guardado = sheets_service.guardar_resultado_excel("BRIEF", fila_excel)
+    guardado = sheets_service.guardar_resultado_excel("BRIEF", fila_excel, items=respuestas)
     
     return {
         "mensaje": "Test BRIEF procesado y guardado correctamente" if guardado else "Test BRIEF procesado (Sheets no sincronizado)",
@@ -189,7 +189,7 @@ def procesar_test_audit_manual(req: AuditManualRequest):
             puntaje_total,
             diagnostico
         ]
-        guardado = sheets_service.guardar_resultado_excel("AUDIT", fila_excel)
+        guardado = sheets_service.guardar_resultado_excel("AUDIT", fila_excel, items=req.respuestas)
 
     return {
         "mensaje": "Test AUDIT calculado con éxito",
@@ -227,7 +227,7 @@ def procesar_test_brief_manual(req: BriefManualRequest):
             resultados["total"],
             "SÍ" if resultados["validez"]["alerta_entrevista"] else "NO"
         ]
-        guardado = sheets_service.guardar_resultado_excel("BRIEF", fila_excel)
+        guardado = sheets_service.guardar_resultado_excel("BRIEF", fila_excel, items=req.respuestas)
 
     return {
         "mensaje": "Test BRIEF calculado con éxito",
@@ -266,7 +266,7 @@ async def procesar_test_pass_ocr(files: List[UploadFile] = File(...)):
         f"SÍ (Pts: {resultados['item_7_fobia']['puntaje']})" if resultados["item_7_fobia"]["alerta_fobia"] else f"NO (Pts: {resultados['item_7_fobia']['puntaje']})"
     ]
 
-    guardado = sheets_service.guardar_resultado_excel("PASS", fila_excel)
+    guardado = sheets_service.guardar_resultado_excel("PASS", fila_excel, items=resultados["respuestas"])
 
     return {
         "mensaje": "Test PASS procesado correctamente",
@@ -307,7 +307,7 @@ async def procesar_test_pass_manual(payload: SolicitudPassManual):
             resultados["riesgo_trastorno"],
             f"SÍ (Pts: {resultados['item_7_fobia']['puntaje']})" if resultados["item_7_fobia"]["alerta_fobia"] else f"NO (Pts: {resultados['item_7_fobia']['puntaje']})"
         ]
-        guardado = sheets_service.guardar_resultado_excel("PASS", fila_excel)
+        guardado = sheets_service.guardar_resultado_excel("PASS", fila_excel, items=resultados["respuestas"])
 
     return {
         "mensaje": "Test PASS evaluado manualmente",
@@ -367,7 +367,7 @@ async def procesar_test_psicosocial_ocr(files: List[UploadFile] = File(...)):
         resultados["puntaje_global"]
     ]
 
-    guardado = sheets_service.guardar_resultado_excel("PSICOSOCIAL", fila_excel)
+    guardado = sheets_service.guardar_resultado_excel("PSICOSOCIAL", fila_excel, items=resultados["respuestas"])
 
     return {
         "mensaje": "Test PSICOSOCIAL procesado y guardado correctamente" if guardado else "Test PSICOSOCIAL procesado (Sheets no sincronizado)",
@@ -414,7 +414,7 @@ async def procesar_test_psicosocial_manual(payload: SolicitudPsicosocialManual):
             dim["vivencia_embarazo"]["nivel"],
             resultados["puntaje_global"]
         ]
-        guardado = sheets_service.guardar_resultado_excel("PSICOSOCIAL", fila_excel)
+        guardado = sheets_service.guardar_resultado_excel("PSICOSOCIAL", fila_excel, items=resultados["respuestas"])
 
     return {
         "mensaje": "Test PSICOSOCIAL evaluado manualmente",
@@ -423,6 +423,72 @@ async def procesar_test_psicosocial_manual(payload: SolicitudPsicosocialManual):
         "resultados": resultados,
         "respuestas": respuestas
     }
+
+
+# ---------------------------------------------------------------------------
+# Estadísticas estilo Jamovi y exportación de datasets
+# ---------------------------------------------------------------------------
+
+class RegistrosLocales(BaseModel):
+    registros: List[dict] = Field(default_factory=list)
+
+
+def _tipo_valido(tipo_test: str) -> str:
+    tipo = tipo_test.upper()
+    if tipo not in analytics_service.TESTS_SOPORTADOS:
+        raise HTTPException(status_code=404, detail=f"Test no soportado: {tipo_test}")
+    return tipo
+
+
+def _respuesta_export(tipo: str, filas: list, incluir_nombres: bool, formato: str) -> Response:
+    if formato == "sav":
+        contenido = analytics_service.generar_sav_jamovi(tipo, filas, incluir_nombres=incluir_nombres)
+        media_type = "application/x-spss-sav"
+    elif formato == "csv":
+        contenido = analytics_service.generar_csv_jamovi(tipo, filas, incluir_nombres=incluir_nombres).encode("utf-8")
+        media_type = "text/csv; charset=utf-8"
+    else:
+        raise HTTPException(status_code=400, detail="Formato no soportado. Use 'csv' o 'sav'.")
+    return Response(
+        content=contenido,
+        media_type=media_type,
+        headers={"Content-Disposition": f'attachment; filename="jamovi_{tipo.lower()}_dataset.{formato}"'},
+    )
+
+
+@app.get("/api/analytics/{tipo_test}")
+def analitica_sheets(tipo_test: str):
+    tipo = _tipo_valido(tipo_test)
+    filas = sheets_service.obtener_registros_hoja(tipo)
+    return analytics_service.generar_analitica_jamovi(tipo, filas)
+
+
+@app.post("/api/analytics/{tipo_test}/from-local")
+def analitica_local(tipo_test: str, payload: RegistrosLocales, incluir_sheets: bool = False):
+    """Analiza registros del historial local; con incluir_sheets=true los combina con los de Sheets."""
+    tipo = _tipo_valido(tipo_test)
+    filas = (sheets_service.obtener_registros_hoja(tipo) if incluir_sheets else []) + payload.registros
+    return analytics_service.generar_analitica_jamovi(tipo, filas)
+
+
+@app.get("/api/export/jamovi/{tipo_test}")
+def exportar_jamovi(tipo_test: str, incluir_nombres: bool = False, formato: str = "csv"):
+    tipo = _tipo_valido(tipo_test)
+    filas = sheets_service.obtener_registros_hoja(tipo)
+    return _respuesta_export(tipo, filas, incluir_nombres, formato.lower())
+
+
+@app.post("/api/export/jamovi/{tipo_test}/from-local")
+def exportar_jamovi_local(
+    tipo_test: str,
+    payload: RegistrosLocales,
+    incluir_nombres: bool = False,
+    incluir_sheets: bool = False,
+    formato: str = "csv",
+):
+    tipo = _tipo_valido(tipo_test)
+    filas = (sheets_service.obtener_registros_hoja(tipo) if incluir_sheets else []) + payload.registros
+    return _respuesta_export(tipo, filas, incluir_nombres, formato.lower())
 
 
 # Configuración para Despliegue en Producción (servir frontend compilado si existe)
