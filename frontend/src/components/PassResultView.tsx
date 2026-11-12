@@ -106,8 +106,8 @@ export const PassResultView: React.FC<PassResultViewProps> = ({ data, onReset })
       {/* ── Cabecera ─────────────────────────────────────────────── */}
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between pb-5 border-b border-slate-100 gap-4">
         <div>
-          <span className="text-xs font-semibold tracking-wider uppercase text-fuchsia-600 bg-fuchsia-50 px-2.5 py-1 rounded-full">
-            Resultado PASS — Ansiedad Perinatal
+          <span className="text-sm font-semibold text-blue-700">
+            Resultado PASS: Ansiedad Perinatal
           </span>
           <h2 className="text-xl font-bold text-slate-900 mt-2">{pac.nombre}</h2>
         </div>
@@ -120,7 +120,7 @@ export const PassResultView: React.FC<PassResultViewProps> = ({ data, onReset })
         ) : (
           <span className="inline-flex items-center gap-1.5 text-xs font-medium bg-slate-100 text-slate-600 px-3 py-1.5 rounded-full border border-slate-200 shrink-0">
             <Database className="w-3.5 h-3.5" />
-            Sheets no sincronizado
+            Pendiente de enviar a Sheets
           </span>
         )}
       </div>
@@ -130,8 +130,8 @@ export const PassResultView: React.FC<PassResultViewProps> = ({ data, onReset })
         <div className="flex items-center gap-2 p-3 bg-slate-50 rounded-xl border border-slate-200">
           <User className="w-4 h-4 text-slate-500 shrink-0" />
           <div>
-            <div className="text-[10px] uppercase font-semibold text-slate-500 tracking-wider">Edad</div>
-            <div className="font-bold text-slate-800">{pac.edad > 0 ? `${pac.edad} años` : "—"}</div>
+            <div className="text-xs font-semibold text-slate-500">Edad</div>
+            <div className="font-bold text-slate-800">{pac.edad > 0 ? `${pac.edad} años` : "Sin dato"}</div>
           </div>
         </div>
 
@@ -139,25 +139,25 @@ export const PassResultView: React.FC<PassResultViewProps> = ({ data, onReset })
           <div className="flex items-center gap-2 p-3 bg-slate-50 rounded-xl border border-slate-200 col-span-2 sm:col-span-1">
             <Briefcase className="w-4 h-4 text-slate-500 shrink-0" />
             <div>
-              <div className="text-[10px] uppercase font-semibold text-slate-500 tracking-wider">Ocupación</div>
+              <div className="text-xs font-semibold text-slate-500">Ocupación</div>
               <div className="font-bold text-slate-800 truncate">{pac.ocupacion}</div>
             </div>
           </div>
         )}
 
-        <div className="flex items-center gap-2 p-3 bg-fuchsia-50 rounded-xl border border-fuchsia-200">
-          <Baby className="w-4 h-4 text-fuchsia-600 shrink-0" />
+        <div className="flex items-center gap-2 p-3 bg-blue-50 rounded-xl border border-blue-200">
+          <Baby className="w-4 h-4 text-blue-600 shrink-0" />
           <div>
-            <div className="text-[10px] uppercase font-semibold text-fuchsia-700 tracking-wider">Etapa</div>
-            <div className="font-bold text-fuchsia-900">{pac.etapa_perinatal}</div>
+            <div className="text-xs font-semibold text-blue-700">Etapa</div>
+            <div className="font-bold text-blue-900">{pac.etapa_perinatal}</div>
           </div>
         </div>
 
         {pac.etapa_perinatal === "Prenatal" && pac.semanas_embarazo > 0 && (
           <div className="flex items-center gap-2 p-3 bg-slate-50 rounded-xl border border-slate-200">
-            <Baby className="w-4 h-4 text-indigo-500 shrink-0" />
+            <Baby className="w-4 h-4 text-blue-500 shrink-0" />
             <div>
-              <div className="text-[10px] uppercase font-semibold text-slate-500 tracking-wider">Semanas</div>
+              <div className="text-xs font-semibold text-slate-500">Semanas</div>
               <div className="font-bold text-slate-800">{pac.semanas_embarazo} sem.</div>
             </div>
           </div>
@@ -165,9 +165,9 @@ export const PassResultView: React.FC<PassResultViewProps> = ({ data, onReset })
 
         {pac.etapa_perinatal === "Posnatal" && pac.edad_bebe >= 0 && (
           <div className="flex items-center gap-2 p-3 bg-slate-50 rounded-xl border border-slate-200">
-            <Baby className="w-4 h-4 text-indigo-500 shrink-0" />
+            <Baby className="w-4 h-4 text-blue-500 shrink-0" />
             <div>
-              <div className="text-[10px] uppercase font-semibold text-slate-500 tracking-wider">Edad bebé</div>
+              <div className="text-xs font-semibold text-slate-500">Edad bebé</div>
               <div className="font-bold text-slate-800">{pac.edad_bebe} mes(es)</div>
             </div>
           </div>
@@ -177,7 +177,7 @@ export const PassResultView: React.FC<PassResultViewProps> = ({ data, onReset })
           <div className="flex items-center gap-2 p-3 bg-slate-50 rounded-xl border border-slate-200">
             <Calendar className="w-4 h-4 text-slate-500 shrink-0" />
             <div>
-              <div className="text-[10px] uppercase font-semibold text-slate-500 tracking-wider">Fecha</div>
+              <div className="text-xs font-semibold text-slate-500">Fecha</div>
               <div className="font-bold text-slate-800">{pac.fecha}</div>
             </div>
           </div>
@@ -190,7 +190,7 @@ export const PassResultView: React.FC<PassResultViewProps> = ({ data, onReset })
           <ShieldAlert className="w-6 h-6 text-rose-600 shrink-0 mt-0.5" />
           <div className="text-xs space-y-1">
             <h4 className="font-bold text-sm text-rose-900">
-              ⚠️ INDICADOR CLÍNICO DE FOBIA — Ítem 7 con puntaje elevado ({item_7_fobia.puntaje}/3)
+              Indicador clínico de fobia: ítem 7 con puntaje elevado ({item_7_fobia.puntaje}/3)
             </h4>
             <p className="text-rose-800">
               <strong>Ítem 7:</strong> "Miedos muy fuertes sobre ciertas cosas: agujas, sangre, al parto, al dolor, etc."<br />
@@ -204,12 +204,12 @@ export const PassResultView: React.FC<PassResultViewProps> = ({ data, onReset })
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Puntaje total */}
         <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 md:col-span-2">
-          <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">
+          <span className="text-xs font-medium text-slate-500">
             Puntaje Global (0 – 93)
           </span>
           <div className="flex items-baseline gap-2 my-2">
             <span className="text-4xl font-extrabold text-slate-900">{total}</span>
-            <span className="text-sm text-slate-400 font-medium">/ 93 pts</span>
+            <span className="text-sm text-slate-500 font-medium">/ 93 pts</span>
           </div>
 
           {/* Barra segmentada */}
@@ -232,12 +232,12 @@ export const PassResultView: React.FC<PassResultViewProps> = ({ data, onReset })
               style={{ left: `${cortePct}%` }}
             />
           </div>
-          <div className="flex justify-between text-[10px] text-slate-500 mt-1">
+          <div className="flex justify-between text-xs text-slate-500 mt-1">
             <span className="text-emerald-700 font-semibold">0–20 Asintomático</span>
             <span className="text-amber-700 font-semibold">21–41 Leve-Mod.</span>
             <span className="text-rose-700 font-semibold">42–93 Severo</span>
           </div>
-          <p className="text-[11px] text-slate-500 mt-2">
+          <p className="text-xs text-slate-500 mt-2">
             La línea vertical indica el <strong>punto de corte clínico de 26 pts</strong> (Bajo riesgo vs Alto riesgo).
           </p>
         </div>
@@ -245,11 +245,11 @@ export const PassResultView: React.FC<PassResultViewProps> = ({ data, onReset })
         {/* Nivel de riesgo y severidad */}
         <div className="flex flex-col gap-3">
           <div className={`p-4 rounded-xl border ${esAltoRiesgo ? "bg-rose-50 border-rose-200" : "bg-emerald-50 border-emerald-200"}`}>
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Nivel de Riesgo</span>
+            <span className="text-xs font-semibold text-slate-500">Nivel de Riesgo</span>
             <div className={`mt-1 text-base font-extrabold ${esAltoRiesgo ? "text-rose-800" : "text-emerald-800"}`}>
               {riesgo_trastorno}
             </div>
-            <p className="text-[10px] mt-0.5 text-slate-500">
+            <p className="text-xs mt-0.5 text-slate-500">
               Corte clínico: {data.resultados.corte_riesgo} pts
             </p>
           </div>
@@ -257,7 +257,7 @@ export const PassResultView: React.FC<PassResultViewProps> = ({ data, onReset })
           <div className={`p-4 rounded-xl border flex items-center gap-2 ${severidadColor}`}>
             <SeveridadIcon className="w-5 h-5 shrink-0" />
             <div>
-              <div className="text-[10px] font-semibold uppercase tracking-wider opacity-70">Severidad</div>
+              <div className="text-xs font-semibold opacity-70">Severidad</div>
               <div className="font-bold text-sm">{severidad}</div>
             </div>
           </div>
@@ -266,8 +266,8 @@ export const PassResultView: React.FC<PassResultViewProps> = ({ data, onReset })
 
       {/* ── Gráfico de las 4 subescalas ─────────────────────────── */}
       <div className="space-y-3">
-        <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
-          <Layers className="w-4 h-4 text-fuchsia-600" />
+        <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+          <Layers className="w-4 h-4 text-blue-600" />
           Puntuaciones en las 4 Subescalas Clínicas
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -280,10 +280,10 @@ export const PassResultView: React.FC<PassResultViewProps> = ({ data, onReset })
                 <div className="flex justify-between items-baseline">
                   <div>
                     <h5 className="font-bold text-slate-800 text-sm">{meta.titulo}</h5>
-                    <p className="text-[11px] text-slate-500">Ítems {meta.items}</p>
+                    <p className="text-xs text-slate-500">Ítems {meta.items}</p>
                   </div>
-                  <span className="text-base font-extrabold text-slate-900 font-mono ml-2">
-                    {puntaje} <span className="text-[10px] text-slate-400 font-normal">/ {max}</span>
+                  <span className="text-base font-extrabold text-slate-900 font-mono ml-2 shrink-0 whitespace-nowrap">
+                    {puntaje} <span className="text-xs text-slate-500 font-normal">/ {max}</span>
                   </span>
                 </div>
                 <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
@@ -324,12 +324,12 @@ export const PassResultView: React.FC<PassResultViewProps> = ({ data, onReset })
                       <span className="font-semibold text-slate-700">Ítem {item.numero}: </span>
                       <span className="text-slate-500">{item.texto}</span>
                       {item.esIndicadorFobia && (
-                        <span className="ml-1 text-[10px] bg-rose-100 text-rose-700 px-1 py-0.5 rounded font-semibold">
-                          ★ Indicador Fobia
+                        <span className="ml-1 text-xs bg-rose-100 text-rose-700 px-1 py-0.5 rounded font-semibold">
+                          Indicador de fobia
                         </span>
                       )}
                       <span className="text-blue-600 font-medium block mt-0.5">{etiqueta}</span>
-                      <span className="text-[10px] text-slate-400 block">{item.indicadorRiesgo}</span>
+                      <span className="text-xs text-slate-500 block">{item.indicadorRiesgo}</span>
                     </div>
                     <span className="font-mono font-bold bg-slate-100 text-slate-800 px-2 py-0.5 rounded text-xs shrink-0">
                       +{valor}
@@ -349,7 +349,7 @@ export const PassResultView: React.FC<PassResultViewProps> = ({ data, onReset })
             onClick={onReset}
             className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition"
           >
-            ← Realizar otra prueba
+            Calificar otro test
           </button>
         </div>
       )}

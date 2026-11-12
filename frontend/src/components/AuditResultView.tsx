@@ -47,13 +47,13 @@ export const AuditResultView: React.FC<AuditResultViewProps> = ({ data, onReset 
       {/* Cabecera del Resultado */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-5 border-b border-slate-100 gap-4">
         <div>
-          <span className="text-xs font-semibold tracking-wider uppercase text-blue-600 bg-blue-50 px-2.5 py-1 rounded-full">
+          <span className="text-sm font-semibold text-blue-700">
             Resultado AUDIT (OMS)
           </span>
           <h2 className="text-xl font-bold text-slate-900 mt-2 flex items-center gap-2">
             <span>{data.paciente || "Paciente Anónimo"}</span>
             {data.genero && (
-              <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
+              <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 whitespace-nowrap shrink-0">
                 {data.genero.toUpperCase() === "M" ? "Hombre" : data.genero.toUpperCase() === "F" ? "Mujer" : data.genero}
                 {data.edad ? ` • ${data.edad} años` : ""}
               </span>
@@ -71,7 +71,7 @@ export const AuditResultView: React.FC<AuditResultViewProps> = ({ data, onReset 
           ) : (
             <span className="inline-flex items-center gap-1.5 text-xs font-medium bg-slate-100 text-slate-600 px-3 py-1.5 rounded-full border border-slate-200">
               <Database className="w-3.5 h-3.5" />
-              Sheets no sincronizado
+              Pendiente de enviar a Sheets
             </span>
           )}
         </div>
@@ -81,12 +81,12 @@ export const AuditResultView: React.FC<AuditResultViewProps> = ({ data, onReset 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Puntaje */}
         <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 flex flex-col justify-between">
-          <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">
+          <span className="text-xs font-medium text-slate-500">
             Puntaje Total Obtenido
           </span>
           <div className="flex items-baseline gap-2 my-2">
             <span className="text-4xl font-extrabold text-slate-900">{data.puntaje}</span>
-            <span className="text-sm text-slate-400 font-medium">/ 40 pts</span>
+            <span className="text-sm text-slate-500 font-medium">/ 40 pts</span>
           </div>
           {/* Barra de progreso */}
           <div className="w-full bg-slate-200 rounded-full h-2.5 overflow-hidden">
@@ -98,7 +98,7 @@ export const AuditResultView: React.FC<AuditResultViewProps> = ({ data, onReset 
         <div className="md:col-span-2 bg-slate-50 border border-slate-200 rounded-xl p-5 flex flex-col justify-between">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">
+              <span className="text-xs font-medium text-slate-500">
                 Diagnóstico del Algoritmo
               </span>
               <div className="mt-1">
@@ -108,7 +108,7 @@ export const AuditResultView: React.FC<AuditResultViewProps> = ({ data, onReset 
                 </span>
               </div>
             </div>
-            <Award className="w-6 h-6 text-slate-400" />
+            <Award className="w-6 h-6 text-slate-500" />
           </div>
 
           <p className="text-xs text-slate-600 mt-3 pt-3 border-t border-slate-200/80">
@@ -120,7 +120,7 @@ export const AuditResultView: React.FC<AuditResultViewProps> = ({ data, onReset 
       {/* Desglose de las 10 preguntas si están disponibles */}
       {data.respuestas && data.respuestas.length === 10 && (
         <div className="space-y-3">
-          <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">
+          <h3 className="text-sm font-bold text-slate-800">
             Desglose Ítem por Ítem (1 al 10)
           </h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">

@@ -180,9 +180,9 @@ export function App() {
 
       {/* Pie de página */}
       <footer className="border-t border-slate-200 bg-white py-4 mb-[calc(3.5rem+env(safe-area-inset-bottom))] sm:mb-0 text-center text-xs text-slate-500">
-        <div className="max-w-4xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <span>Sistema de Corrección Psicométrica Automatizada • Psicología Clínica</span>
-          <span className="hidden sm:inline text-[11px] text-slate-400">FastAPI + React 19 + Gemini Flash + Google Sheets</span>
+        <div className="max-w-4xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-1 sm:gap-2">
+          <span>Corrección de tests psicométricos · Psicología Clínica</span>
+          <span>Los resultados se guardan en este dispositivo y en Google Sheets</span>
         </div>
       </footer>
     </div>

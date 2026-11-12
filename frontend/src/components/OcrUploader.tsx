@@ -3,6 +3,13 @@ import { Camera, Images, X, AlertCircle, FileText, FileCheck, Image as ImageIcon
 
 type TipoTest = "AUDIT" | "BRIEF" | "PASS" | "PSICOSOCIAL";
 
+const ETIQUETA_TEST: Record<TipoTest, string> = {
+  AUDIT: "1 foto",
+  BRIEF: "2 fotos",
+  PASS: "2 fotos",
+  PSICOSOCIAL: "Gestantes · 1 a 8",
+};
+
 interface OcrUploaderProps {
   onResultadoAudit: (res: any) => void;
   onResultadoBrief: (res: any) => void;
@@ -98,7 +105,7 @@ export const OcrUploader: React.FC<OcrUploaderProps> = ({
     }
 
     setCargando(true);
-    setEtapaCarga("Subiendo archivo(s) al backend...");
+    setEtapaCarga("Enviando las fotos…");
     try {
       const formData = new FormData();
       const apiBase = import.meta.env.VITE_API_URL || "";
@@ -123,7 +130,7 @@ export const OcrUploader: React.FC<OcrUploaderProps> = ({
         url = `${apiBase}/api/upload/psicosocial`;
       }
 
-      setEtapaCarga("Google Gemini Flash analizando y extrayendo respuestas...");
+      setEtapaCarga("Leyendo las respuestas de las hojas…");
       const response = await fetch(url, { method: "POST", body: formData });
       if (!response.ok) {
         const errorData = await response.json().catch(() => null);
@@ -140,7 +147,7 @@ export const OcrUploader: React.FC<OcrUploaderProps> = ({
     } catch (err: any) {
       let msg = err.message || "Ocurrió un error al procesar el cuestionario.";
       if (msg.includes("Failed to fetch") || msg.includes("NetworkError")) {
-        msg = "No se pudo conectar con el servidor backend. Verifica que FastAPI esté corriendo en el puerto 8000.";
+        msg = "No se pudo conectar con el servidor. Revisa tu conexión a internet y vuelve a intentarlo; las fotos siguen seleccionadas.";
       }
       setError(msg);
     } finally {
@@ -159,9 +166,9 @@ export const OcrUploader: React.FC<OcrUploaderProps> = ({
   return (
     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 sm:p-6 space-y-5 sm:space-y-6">
       <div>
-        <h2 className="text-lg sm:text-xl font-bold text-slate-900">Escaneo de Hojas Físicas con IA</h2>
+        <h2 className="text-lg sm:text-xl font-bold text-slate-900">Calificar un test desde fotos</h2>
         <p className="text-xs text-slate-500 mt-1">
-          Toma fotografías con la cámara o sube documentos escaneados (imágenes o PDF). Google Gemini Flash extraerá las respuestas y el backend calculará los puntajes automáticamente.
+          Fotografía las hojas respondidas o sube el escaneo (imagen o PDF). La app lee las respuestas, calcula los puntajes y guarda el resultado en el historial.
         </p>
       </div>
 
@@ -170,34 +177,22 @@ export const OcrUploader: React.FC<OcrUploaderProps> = ({
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {(["AUDIT", "BRIEF", "PASS", "PSICOSOCIAL"] as TipoTest[]).map((tipo) => {
             const activo = tipoTest === tipo;
-            let label: string;
-            let activeColor = "bg-blue-600 text-white border-blue-600";
-
-            if (tipo === "AUDIT") {
-              label = "AUDIT (1 Img)";
-            } else if (tipo === "BRIEF") {
-              label = "BRIEF (2 Imgs)";
-              activeColor = "bg-indigo-600 text-white border-indigo-600";
-            } else if (tipo === "PASS") {
-              label = "PASS (2 Imgs)";
-              activeColor = "bg-fuchsia-600 text-white border-fuchsia-600";
-            } else {
-              label = "🤰 PSICOSOCIAL (Gestantes)";
-              activeColor = "bg-purple-600 text-white border-purple-600";
-            }
-
             return (
               <button
                 key={tipo}
                 type="button"
                 onClick={() => cambiarTipo(tipo)}
-                className={`min-h-11 py-2.5 px-3 rounded-xl border font-semibold text-xs transition text-center ${
+                aria-pressed={activo}
+                className={`min-h-11 py-2 px-3 rounded-xl border text-center transition flex flex-col items-center justify-center leading-tight ${
                   activo
-                    ? `${activeColor} shadow-sm`
-                    : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
+                    ? "bg-blue-600 text-white border-blue-600"
+                    : "bg-white text-slate-700 border-slate-300 hover:bg-slate-50"
                 }`}
               >
-                {label}
+                <span className="text-sm font-semibold">{tipo}</span>
+                <span className={`text-xs ${activo ? "text-blue-100" : "text-slate-500"}`}>
+                  {ETIQUETA_TEST[tipo]}
+                </span>
               </button>
             );
           })}
@@ -217,7 +212,6 @@ export const OcrUploader: React.FC<OcrUploaderProps> = ({
               }
               archivo={archivo1}
               preview={preview1}
-              accentColor={tipoTest === "PASS" ? "fuchsia" : "blue"}
               onChange={handleArchivo1Change}
             />
 
@@ -231,7 +225,6 @@ export const OcrUploader: React.FC<OcrUploaderProps> = ({
                 }
                 archivo={archivo2}
                 preview={preview2}
-                accentColor={tipoTest === "PASS" ? "fuchsia" : "indigo"}
                 onChange={handleArchivo2Change}
               />
             )}
@@ -239,19 +232,19 @@ export const OcrUploader: React.FC<OcrUploaderProps> = ({
         ) : (
           /* Subida dinámica de 1 a 8 páginas para PSICOSOCIAL */
           <div className="space-y-4">
-            <div className="p-3 sm:p-4 rounded-xl border-2 border-dashed border-purple-300 hover:border-purple-400 bg-purple-50/40 transition">
+            <div className="p-3 sm:p-4 rounded-xl border-2 border-dashed border-blue-300 hover:border-blue-400 bg-blue-50/40 transition">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-2">
                 <div>
                   <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                    <FileText className="w-4 h-4 text-purple-600" />
+                    <FileText className="w-4 h-4 text-blue-600" />
                     Hojas del Cuestionario PSICOSOCIAL (1 a 8 páginas o PDF)
                   </label>
-                  <p className="text-[11px] text-slate-500 mt-0.5">
+                  <p className="text-xs text-slate-500 mt-0.5">
                     Puedes tomar fotos de las páginas (datos sociodemográficos y escalas Likert) o subir el documento escaneado completo.
                   </p>
                 </div>
                 {archivosPsicosocial.length > 0 && (
-                  <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 self-start sm:self-auto">
+                  <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 self-start sm:self-auto">
                     {archivosPsicosocial.length} de 8 páginas
                   </span>
                 )}
@@ -259,11 +252,10 @@ export const OcrUploader: React.FC<OcrUploaderProps> = ({
 
               {/* Botón de selección múltiple */}
               {archivosPsicosocial.length < 8 && (
-                <div className="pt-3 border-t border-purple-100 mt-3">
+                <div className="pt-3 border-t border-blue-100 mt-3">
                   <SelectorArchivo
                     multiple
                     accept="image/*,application/pdf"
-                    color="purple"
                     onFiles={handleAgregarArchivosPsicosocial}
                   />
                 </div>
@@ -276,7 +268,7 @@ export const OcrUploader: React.FC<OcrUploaderProps> = ({
                 <div className="flex items-center justify-between text-xs text-slate-600 font-medium">
                   <span>Páginas seleccionadas ({archivosPsicosocial.length}):</span>
                   {archivosPsicosocial.length < 8 && (
-                    <span className="text-[11px] text-purple-600 font-semibold">
+                    <span className="text-xs text-blue-600 font-semibold">
                       Puedes agregar hasta {8 - archivosPsicosocial.length} página(s) más
                     </span>
                   )}
@@ -301,7 +293,7 @@ export const OcrUploader: React.FC<OcrUploaderProps> = ({
                         ) : esPdf ? (
                           <div className="w-14 h-16 bg-red-50 text-red-600 rounded border border-red-200 flex flex-col items-center justify-center shrink-0">
                             <FileText className="w-6 h-6" />
-                            <span className="text-[9px] font-bold mt-0.5">PDF</span>
+                            <span className="text-xs font-bold mt-0.5">PDF</span>
                           </div>
                         ) : (
                           <div className="w-14 h-16 bg-slate-100 text-slate-500 rounded border border-slate-200 flex items-center justify-center shrink-0">
@@ -310,13 +302,13 @@ export const OcrUploader: React.FC<OcrUploaderProps> = ({
                         )}
 
                         <div className="min-w-0 flex-1 text-xs">
-                          <span className="text-[10px] uppercase font-bold text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded">
+                          <span className="text-xs font-bold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded">
                             Página {idx + 1}
                           </span>
                           <p className="font-semibold text-slate-800 truncate mt-1">
                             {file.name}
                           </p>
-                          <p className="text-[10px] text-slate-400">
+                          <p className="text-xs text-slate-500">
                             {(file.size / 1024).toFixed(1)} KB
                           </p>
                         </div>
@@ -324,8 +316,8 @@ export const OcrUploader: React.FC<OcrUploaderProps> = ({
                         <button
                           type="button"
                           onClick={() => handleQuitarArchivoPsicosocial(idx)}
-                          title="Quitar esta página"
-                          className="p-2 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition"
+                          title="Quitar esta página" aria-label="Quitar esta página"
+                          className="p-2 rounded-lg text-slate-500 hover:text-rose-600 hover:bg-rose-50 transition"
                         >
                           <X className="w-4 h-4" />
                         </button>
@@ -348,25 +340,17 @@ export const OcrUploader: React.FC<OcrUploaderProps> = ({
         <button
           type="submit"
           disabled={deshabilitado}
-          className={`w-full py-3.5 sm:py-3 px-4 rounded-xl font-bold text-white shadow-md disabled:opacity-50 transition flex items-center justify-center gap-2 text-sm ${
-            tipoTest === "PSICOSOCIAL"
-              ? "bg-purple-600 hover:bg-purple-700 shadow-purple-500/20"
-              : tipoTest === "PASS"
-              ? "bg-fuchsia-600 hover:bg-fuchsia-700 shadow-fuchsia-500/20"
-              : tipoTest === "BRIEF"
-              ? "bg-indigo-600 hover:bg-indigo-700 shadow-indigo-500/20"
-              : "bg-blue-600 hover:bg-blue-700 shadow-blue-500/20"
-          }`}
+          className="w-full py-3.5 sm:py-3 px-4 rounded-xl font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 transition flex items-center justify-center gap-2 text-sm"
         >
           {cargando ? (
             <>
               <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              <span>{etapaCarga || "Procesando documentos con IA..."}</span>
+              <span>{etapaCarga || "Leyendo las hojas…"}</span>
             </>
           ) : (
             <>
               <FileCheck className="w-4 h-4" />
-              <span>Analizar y Calificar con Gemini Flash</span>
+              <span>Calificar test</span>
             </>
           )}
         </button>
@@ -380,31 +364,15 @@ const FileDropZone: React.FC<{
   label: string;
   archivo: File | null;
   preview: string | null;
-  accentColor: string;
   onChange: (file: File | null) => void;
-}> = ({ label, archivo, preview, accentColor, onChange }) => {
-  const borderHover =
-    accentColor === "fuchsia"
-      ? "hover:border-fuchsia-400"
-      : accentColor === "indigo"
-      ? "hover:border-indigo-400"
-      : "hover:border-blue-400";
-  const iconColor =
-    accentColor === "fuchsia"
-      ? "text-fuchsia-600"
-      : accentColor === "indigo"
-      ? "text-indigo-600"
-      : "text-blue-600";
-
+}> = ({ label, archivo, preview, onChange }) => {
   return (
-    <div
-      className={`p-3 sm:p-4 rounded-xl border-2 border-dashed border-slate-300 ${borderHover} bg-slate-50 transition`}
-    >
+    <div className="p-3 sm:p-4 rounded-xl border-2 border-dashed border-slate-300 hover:border-blue-400 bg-slate-50 transition">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-2">
-        <label className={`text-xs font-bold text-slate-700 flex items-center gap-1.5`}>
-          <FileText className={`w-4 h-4 ${iconColor}`} />
+        <p className="text-sm font-semibold text-slate-800 flex items-center gap-1.5">
+          <FileText className="w-4 h-4 text-blue-600 shrink-0" aria-hidden="true" />
           {label}
-        </label>
+        </p>
         {archivo && (
           <button
             type="button"
@@ -420,7 +388,9 @@ const FileDropZone: React.FC<{
         <div className="flex items-center gap-4 bg-white p-3 rounded-lg border border-slate-200">
           <img
             src={preview}
-            alt="Preview"
+            alt={`Vista previa: ${label}`}
+            width={64}
+            height={80}
             className="w-16 h-20 object-cover rounded border border-slate-200 shrink-0"
           />
           <div className="text-xs space-y-1 min-w-0">
@@ -428,7 +398,7 @@ const FileDropZone: React.FC<{
             <p className="text-slate-500">
               {((archivo?.size || 0) / 1024).toFixed(1)} KB
             </p>
-            <span className="inline-block text-[10px] bg-emerald-100 text-emerald-800 font-semibold px-2 py-0.5 rounded">
+            <span className="inline-block text-xs bg-emerald-100 text-emerald-800 font-semibold px-2 py-0.5 rounded">
               Listo para analizar
             </span>
           </div>
@@ -437,7 +407,6 @@ const FileDropZone: React.FC<{
         <div className="pt-1">
           <SelectorArchivo
             accept="image/*"
-            color={accentColor}
             onFiles={(files) => onChange(files?.[0] || null)}
           />
         </div>
@@ -449,19 +418,11 @@ const FileDropZone: React.FC<{
 // ── Botones "Tomar foto" / "Galería" ───────────────────────────────
 // En muchos Android, un input con `capture` abre solo la cámara y no deja elegir de la galería,
 // por eso se ofrecen dos entradas separadas.
-const COLORES_BOTON: Record<string, string> = {
-  blue: "bg-blue-600 hover:bg-blue-700 active:bg-blue-800",
-  indigo: "bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800",
-  fuchsia: "bg-fuchsia-600 hover:bg-fuchsia-700 active:bg-fuchsia-800",
-  purple: "bg-purple-600 hover:bg-purple-700 active:bg-purple-800",
-};
-
 const SelectorArchivo: React.FC<{
   accept: string;
   multiple?: boolean;
-  color: string;
   onFiles: (files: FileList | null) => void;
-}> = ({ accept, multiple, color, onFiles }) => {
+}> = ({ accept, multiple, onFiles }) => {
   const manejar = (e: React.ChangeEvent<HTMLInputElement>) => {
     onFiles(e.target.files);
     // Permite volver a elegir el mismo archivo después de quitarlo
@@ -470,17 +431,13 @@ const SelectorArchivo: React.FC<{
 
   return (
     <div className="grid grid-cols-2 gap-2">
-      <label
-        className={`flex items-center justify-center gap-2 min-h-12 px-3 rounded-xl text-white text-sm font-semibold cursor-pointer transition focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-slate-400 ${
-          COLORES_BOTON[color] || COLORES_BOTON.blue
-        }`}
-      >
-        <Camera className="w-5 h-5 shrink-0" />
+      <label className="flex items-center justify-center gap-2 min-h-12 px-3 rounded-xl text-white text-sm font-semibold bg-blue-600 hover:bg-blue-700 active:bg-blue-800 transition focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-blue-600">
+        <Camera className="w-5 h-5 shrink-0" aria-hidden="true" />
         <span>Tomar foto</span>
         <input type="file" accept="image/*" capture="environment" onChange={manejar} className="sr-only" />
       </label>
-      <label className="flex items-center justify-center gap-2 min-h-12 px-3 rounded-xl border border-slate-300 bg-white text-slate-700 text-sm font-semibold cursor-pointer transition hover:bg-slate-50 active:bg-slate-100 focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-slate-400">
-        <Images className="w-5 h-5 shrink-0" />
+      <label className="flex items-center justify-center gap-2 min-h-12 px-3 rounded-xl border border-slate-300 bg-white text-slate-700 text-sm font-semibold transition hover:bg-slate-50 active:bg-slate-100 focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-blue-600">
+        <Images className="w-5 h-5 shrink-0" aria-hidden="true" />
         <span>{accept.includes("pdf") ? "Galería / PDF" : "Galería"}</span>
         <input type="file" accept={accept} multiple={multiple} onChange={manejar} className="sr-only" />
       </label>

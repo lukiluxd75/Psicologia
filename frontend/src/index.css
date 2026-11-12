@@ -34,3 +34,44 @@ html {
 .scrollbar-none::-webkit-scrollbar {
   display: none;
 }
+
+/* Controles: Tailwind v4 ya no pone la mano en los botones */
+@layer base {
+  button:not(:disabled),
+  [role="button"],
+  [role="tab"],
+  summary,
+  select,
+  label:has(> input:not(:disabled)),
+  label[for] {
+    cursor: pointer;
+  }
+
+  button:disabled,
+  select:disabled,
+  input:disabled {
+    cursor: not-allowed;
+  }
+
+  button:not(:disabled):active,
+  label:has(> input[type="file"]):active {
+    filter: brightness(0.94);
+  }
+
+  :focus-visible {
+    outline: 2px solid #2563eb;
+    outline-offset: 2px;
+  }
+}
+
+/* Respeta "reducir movimiento" del sistema */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

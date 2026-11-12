@@ -16,10 +16,10 @@ import { BarPlot, BoxViolinPlot, ChartCard, HistogramPlot } from "./jamovi/Jamov
 type Fuente = "sheets" | "local" | "combinado";
 
 const MODULOS: { id: TipoTest; etiqueta: string; nombre: string }[] = [
-  { id: "AUDIT", etiqueta: "🍺 AUDIT", nombre: "AUDIT" },
-  { id: "BRIEF", etiqueta: "🧠 BRIEF", nombre: "BRIEF" },
-  { id: "PASS", etiqueta: "🤰 PASS (Perinatal)", nombre: "PASS" },
-  { id: "PSICOSOCIAL", etiqueta: "👩‍👧 PSICOSOCIAL (Gestantes)", nombre: "Cuestionario Psicosocial" },
+  { id: "AUDIT", etiqueta: "AUDIT", nombre: "AUDIT" },
+  { id: "BRIEF", etiqueta: "BRIEF", nombre: "BRIEF" },
+  { id: "PASS", etiqueta: "PASS (Perinatal)", nombre: "PASS" },
+  { id: "PSICOSOCIAL", etiqueta: "PSICOSOCIAL (Gestantes)", nombre: "Cuestionario Psicosocial" },
 ];
 
 const FUENTES: { id: Fuente; etiqueta: string }[] = [
@@ -50,7 +50,7 @@ const TablaApa: React.FC<{ numero: number; titulo: string; nota?: string; childr
   nota,
   children,
 }) => (
-  <figure className="space-y-1.5">
+  <figure className="space-y-1.5 min-w-0">
     <figcaption className="text-sm">
       <span className="font-bold text-slate-900">Tabla {numero}</span>
       <br />
@@ -303,7 +303,7 @@ export const JamoviAnalyticsView: React.FC<{ historial: HistorialLocal }> = ({ h
     const desc = datos.descriptivas;
     let html = tablaApaHtml(
       1,
-      `Estadísticos descriptivos — ${tipo}`,
+      `Estadísticos descriptivos: ${tipo}`,
       ["Variable", "N", "Perdidos", "M", "Mdn", "DE", "Mín.", "Máx.", "Q1", "Q3"],
       desc.map((d) => [d.etiqueta, String(d.n), String(d.perdidos), fmt(d.media), fmt(d.mediana), fmt(d.de), fmt(d.minimo, 0), fmt(d.maximo, 0), fmt(d.q1), fmt(d.q3)]),
       `N = ${datos.total_registros}. M = media; Mdn = mediana; DE = desviación estándar; Q1 = percentil 25; Q3 = percentil 75.`
@@ -350,7 +350,7 @@ export const JamoviAnalyticsView: React.FC<{ historial: HistorialLocal }> = ({ h
       {/* Barra de control */}
       <section className="bg-white border border-slate-200 rounded-xl p-4 space-y-4">
         <div>
-          <h2 className="text-base font-bold text-slate-900">📊 Estadísticas y gráficos estilo Jamovi</h2>
+          <h2 className="text-base font-bold text-slate-900">Estadísticas y gráficos estilo Jamovi</h2>
           <p className="text-xs text-slate-500 mt-0.5">
             Tablas en formato APA 7.ª ed. y gráficos listos para informes. Exporta el dataset codificado para abrirlo en Jamovi Desktop.
           </p>
@@ -521,7 +521,7 @@ export const JamoviAnalyticsView: React.FC<{ historial: HistorialLocal }> = ({ h
           </section>
 
           {tablasFrecuencia.length > 0 && (
-            <section className="bg-white border border-slate-200 rounded-xl p-4 sm:p-5 grid gap-6 md:grid-cols-2">
+            <section className="bg-white border border-slate-200 rounded-xl p-4 sm:p-5 grid grid-cols-1 gap-6 md:grid-cols-2">
               {tablasFrecuencia.map(([k, f], i) => (
                 <TablaFrecuencias key={k} etiqueta={f.etiqueta} tabla={f.tabla} numero={i + primeraFrecuencia} />
               ))}

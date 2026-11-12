@@ -113,24 +113,24 @@ const TarjetaAudit: React.FC<{
           </div>
           <div className="flex items-center gap-2 mt-1 flex-wrap">
             <span
-              className={`text-[11px] font-medium px-2 py-0.5 rounded-full border ${badgeColor}`}
+              className={`text-xs font-medium px-2 py-0.5 rounded-full border ${badgeColor}`}
             >
               {entry.diagnostico}
             </span>
-            <span className="text-[11px] font-mono text-slate-500">
+            <span className="text-xs font-mono text-slate-500">
               Puntaje: {entry.puntaje} / 40
             </span>
           </div>
         </div>
 
         <div className="flex items-center gap-1 shrink-0">
-          <span className="hidden sm:flex items-center gap-1 text-[11px] text-slate-400">
+          <span className="hidden sm:flex items-center gap-1 text-xs text-slate-500">
             <Calendar className="w-3 h-3" />
             {formatFecha(entry.fecha)}
           </span>
           <button
             onClick={() => setExpandido((v) => !v)}
-            title="Ver resultado completo"
+            title="Ver resultado completo" aria-label="Ver resultado completo"
             className="p-2.5 sm:p-1.5 rounded-lg hover:bg-blue-50 text-slate-500 hover:text-blue-600 transition"
           >
             {expandido ? (
@@ -141,8 +141,8 @@ const TarjetaAudit: React.FC<{
           </button>
           <button
             onClick={onEliminar}
-            title="Eliminar del historial"
-            className="p-2.5 sm:p-1.5 rounded-lg hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition"
+            title="Eliminar del historial" aria-label="Eliminar del historial"
+            className="p-2.5 sm:p-1.5 rounded-lg hover:bg-rose-50 text-slate-500 hover:text-rose-600 transition"
           >
             <Trash2 className="w-4 h-4" />
           </button>
@@ -170,8 +170,8 @@ const TarjetaBrief: React.FC<{
   return (
     <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs hover:border-slate-300 transition">
       <div className="flex items-center gap-3 p-3 sm:p-4">
-        <div className="hidden sm:flex w-9 h-9 rounded-full bg-indigo-50 border border-indigo-200 items-center justify-center shrink-0">
-          <User className="w-4 h-4 text-indigo-600" />
+        <div className="hidden sm:flex w-9 h-9 rounded-full bg-blue-50 border border-blue-200 items-center justify-center shrink-0">
+          <User className="w-4 h-4 text-blue-600" />
         </div>
 
         <div className="flex-1 min-w-0">
@@ -193,11 +193,11 @@ const TarjetaBrief: React.FC<{
             )}
           </div>
           <div className="flex items-center gap-2 mt-1 flex-wrap">
-            <span className="text-[11px] font-mono text-slate-500">
+            <span className="text-xs font-mono text-slate-500">
               Total: {entry.resultados.total} pts
             </span>
             {alerta && (
-              <span className="inline-flex items-center gap-1 text-[11px] bg-amber-100 text-amber-800 border border-amber-300 px-2 py-0.5 rounded-full font-medium">
+              <span className="inline-flex items-center gap-1 text-xs bg-amber-100 text-amber-800 border border-amber-300 px-2 py-0.5 rounded-full font-medium">
                 <AlertTriangle className="w-3 h-3" />
                 Alerta clínica
               </span>
@@ -206,14 +206,14 @@ const TarjetaBrief: React.FC<{
         </div>
 
         <div className="flex items-center gap-1 shrink-0">
-          <span className="hidden sm:flex items-center gap-1 text-[11px] text-slate-400">
+          <span className="hidden sm:flex items-center gap-1 text-xs text-slate-500">
             <Calendar className="w-3 h-3" />
             {formatFecha(entry.fecha)}
           </span>
           <button
             onClick={() => setExpandido((v) => !v)}
-            title="Ver resultado completo"
-            className="p-1.5 rounded-lg hover:bg-indigo-50 text-slate-500 hover:text-indigo-600 transition"
+            title="Ver resultado completo" aria-label="Ver resultado completo"
+            className="p-1.5 rounded-lg hover:bg-blue-50 text-slate-500 hover:text-blue-600 transition"
           >
             {expandido ? (
               <ChevronUp className="w-4 h-4" />
@@ -223,8 +223,8 @@ const TarjetaBrief: React.FC<{
           </button>
           <button
             onClick={onEliminar}
-            title="Eliminar del historial"
-            className="p-2.5 sm:p-1.5 rounded-lg hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition"
+            title="Eliminar del historial" aria-label="Eliminar del historial"
+            className="p-2.5 sm:p-1.5 rounded-lg hover:bg-rose-50 text-slate-500 hover:text-rose-600 transition"
           >
             <Trash2 className="w-4 h-4" />
           </button>
@@ -269,8 +269,8 @@ const TarjetaPass: React.FC<{
   return (
     <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs hover:border-slate-300 transition">
       <div className="flex items-center gap-3 p-3 sm:p-4">
-        <div className="hidden sm:flex w-9 h-9 rounded-full bg-fuchsia-50 border border-fuchsia-200 items-center justify-center shrink-0">
-          <Baby className="w-4 h-4 text-fuchsia-600" />
+        <div className="hidden sm:flex w-9 h-9 rounded-full bg-blue-50 border border-blue-200 items-center justify-center shrink-0">
+          <Baby className="w-4 h-4 text-blue-600" />
         </div>
 
         <div className="flex-1 min-w-0">
@@ -282,14 +282,14 @@ const TarjetaPass: React.FC<{
               <span className="text-xs text-slate-500">{edadPaciente} años</span>
             )}
             {etapa && (
-              <span className="text-xs bg-fuchsia-50 text-fuchsia-700 border border-fuchsia-200 px-1.5 py-0.5 rounded-full font-medium">
+              <span className="text-xs bg-blue-50 text-blue-700 border border-blue-200 px-1.5 py-0.5 rounded-full font-medium">
                 {etapa}
               </span>
             )}
           </div>
           <div className="flex items-center gap-2 mt-1 flex-wrap">
             <span
-              className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border ${
+              className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${
                 esAltoRiesgo
                   ? "bg-rose-100 text-rose-800 border-rose-300"
                   : "bg-emerald-100 text-emerald-800 border-emerald-300"
@@ -297,11 +297,11 @@ const TarjetaPass: React.FC<{
             >
               {r.riesgo_trastorno} ({r.severidad})
             </span>
-            <span className="text-[11px] font-mono text-slate-500">
+            <span className="text-xs font-mono text-slate-500">
               Total: {r.total} / 93 pts
             </span>
             {alertaFobia && (
-              <span className="inline-flex items-center gap-1 text-[11px] bg-rose-100 text-rose-800 border border-rose-300 px-2 py-0.5 rounded-full font-medium">
+              <span className="inline-flex items-center gap-1 text-xs bg-rose-100 text-rose-800 border border-rose-300 px-2 py-0.5 rounded-full font-medium">
                 <ShieldAlert className="w-3 h-3" />
                 Alerta Fobia (Ítem 7)
               </span>
@@ -310,14 +310,14 @@ const TarjetaPass: React.FC<{
         </div>
 
         <div className="flex items-center gap-1 shrink-0">
-          <span className="hidden sm:flex items-center gap-1 text-[11px] text-slate-400">
+          <span className="hidden sm:flex items-center gap-1 text-xs text-slate-500">
             <Calendar className="w-3 h-3" />
             {formatFecha(entry.fechaRegistro)}
           </span>
           <button
             onClick={() => setExpandido((v) => !v)}
-            title="Ver resultado completo"
-            className="p-1.5 rounded-lg hover:bg-fuchsia-50 text-slate-500 hover:text-fuchsia-600 transition"
+            title="Ver resultado completo" aria-label="Ver resultado completo"
+            className="p-1.5 rounded-lg hover:bg-blue-50 text-slate-500 hover:text-blue-600 transition"
           >
             {expandido ? (
               <ChevronUp className="w-4 h-4" />
@@ -327,8 +327,8 @@ const TarjetaPass: React.FC<{
           </button>
           <button
             onClick={onEliminar}
-            title="Eliminar del historial"
-            className="p-2.5 sm:p-1.5 rounded-lg hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition"
+            title="Eliminar del historial" aria-label="Eliminar del historial"
+            className="p-2.5 sm:p-1.5 rounded-lg hover:bg-rose-50 text-slate-500 hover:text-rose-600 transition"
           >
             <Trash2 className="w-4 h-4" />
           </button>
@@ -361,8 +361,8 @@ const TarjetaPsicosocial: React.FC<{
   return (
     <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs hover:border-slate-300 transition">
       <div className="flex items-center gap-3 p-3 sm:p-4">
-        <div className="hidden sm:flex w-9 h-9 rounded-full bg-purple-50 border border-purple-200 items-center justify-center shrink-0">
-          <Activity className="w-4 h-4 text-purple-600" />
+        <div className="hidden sm:flex w-9 h-9 rounded-full bg-blue-50 border border-blue-200 items-center justify-center shrink-0">
+          <Activity className="w-4 h-4 text-blue-600" />
         </div>
 
         <div className="flex-1 min-w-0">
@@ -374,7 +374,7 @@ const TarjetaPsicosocial: React.FC<{
               <span className="text-xs text-slate-500">{socio.edad} años</span>
             )}
             {socio.semanas_gestacion !== undefined && socio.semanas_gestacion > 0 && (
-              <span className="text-xs bg-purple-50 text-purple-700 border border-purple-200 px-1.5 py-0.5 rounded-full font-medium">
+              <span className="text-xs bg-blue-50 text-blue-700 border border-blue-200 px-1.5 py-0.5 rounded-full font-medium">
                 {socio.semanas_gestacion} sem.
               </span>
             )}
@@ -386,16 +386,16 @@ const TarjetaPsicosocial: React.FC<{
           </div>
 
           <div className="flex items-center gap-2 mt-1 flex-wrap">
-            <span className="text-[11px] font-mono text-slate-600 font-semibold">
+            <span className="text-xs font-mono text-slate-600 font-semibold">
               Puntaje Global: {puntaje_global} / 160 pts
             </span>
             {dimensiones && dimensiones["relacion_pareja"] && (
-              <span className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200">
+              <span className="text-xs bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200">
                 Pareja: {dimensiones["relacion_pareja"].nivel}
               </span>
             )}
             {dimensiones && dimensiones["apoyo_familiar"] && (
-              <span className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200">
+              <span className="text-xs bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200">
                 Familia: {dimensiones["apoyo_familiar"].nivel}
               </span>
             )}
@@ -403,14 +403,14 @@ const TarjetaPsicosocial: React.FC<{
         </div>
 
         <div className="flex items-center gap-1 shrink-0">
-          <span className="hidden sm:flex items-center gap-1 text-[11px] text-slate-400">
+          <span className="hidden sm:flex items-center gap-1 text-xs text-slate-500">
             <Calendar className="w-3 h-3" />
             {formatFecha(entry.fechaRegistro)}
           </span>
           <button
             onClick={() => setExpandido((v) => !v)}
-            title="Ver resultado completo"
-            className="p-1.5 rounded-lg hover:bg-purple-50 text-slate-500 hover:text-purple-600 transition"
+            title="Ver resultado completo" aria-label="Ver resultado completo"
+            className="p-1.5 rounded-lg hover:bg-blue-50 text-slate-500 hover:text-blue-600 transition"
           >
             {expandido ? (
               <ChevronUp className="w-4 h-4" />
@@ -420,8 +420,8 @@ const TarjetaPsicosocial: React.FC<{
           </button>
           <button
             onClick={onEliminar}
-            title="Eliminar del historial"
-            className="p-2.5 sm:p-1.5 rounded-lg hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition"
+            title="Eliminar del historial" aria-label="Eliminar del historial"
+            className="p-2.5 sm:p-1.5 rounded-lg hover:bg-rose-50 text-slate-500 hover:text-rose-600 transition"
           >
             <Trash2 className="w-4 h-4" />
           </button>
@@ -526,7 +526,7 @@ export const HistorialView: React.FC<HistorialViewProps> = ({
                 : "bg-white text-slate-600 border-slate-300 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-300"
             }`}
           >
-            {confirmarLimpiar ? "¿Confirmar borrado?" : "🗑 Limpiar historial"}
+            {confirmarLimpiar ? "¿Confirmar borrado?" : "Limpiar historial"}
           </button>
         )}
         </div>
@@ -556,7 +556,7 @@ export const HistorialView: React.FC<HistorialViewProps> = ({
         >
           Test AUDIT
           {historialAudit.length > 0 && (
-            <span className="ml-1.5 text-[11px] bg-blue-100 text-blue-700 font-bold px-1.5 py-0.5 rounded-full">
+            <span className="ml-1.5 text-xs bg-blue-100 text-blue-700 font-bold px-1.5 py-0.5 rounded-full">
               {historialAudit.length}
             </span>
           )}
@@ -565,13 +565,13 @@ export const HistorialView: React.FC<HistorialViewProps> = ({
           onClick={() => { setPestaña("brief"); setConfirmarLimpiar(false); }}
           className={`shrink-0 whitespace-nowrap px-3 sm:px-4 py-2.5 sm:py-2 text-sm font-medium rounded-t-lg border-b-2 transition-all ${
             pestaña === "brief"
-              ? "border-indigo-600 text-indigo-700 bg-indigo-50/60"
+              ? "border-blue-600 text-blue-700 bg-blue-50/60"
               : "border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50"
           }`}
         >
           Test BRIEF
           {historialBrief.length > 0 && (
-            <span className="ml-1.5 text-[11px] bg-indigo-100 text-indigo-700 font-bold px-1.5 py-0.5 rounded-full">
+            <span className="ml-1.5 text-xs bg-blue-100 text-blue-700 font-bold px-1.5 py-0.5 rounded-full">
               {historialBrief.length}
             </span>
           )}
@@ -580,13 +580,13 @@ export const HistorialView: React.FC<HistorialViewProps> = ({
           onClick={() => { setPestaña("pass"); setConfirmarLimpiar(false); }}
           className={`shrink-0 whitespace-nowrap px-3 sm:px-4 py-2.5 sm:py-2 text-sm font-medium rounded-t-lg border-b-2 transition-all ${
             pestaña === "pass"
-              ? "border-fuchsia-600 text-fuchsia-700 bg-fuchsia-50/60"
+              ? "border-blue-600 text-blue-700 bg-blue-50/60"
               : "border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50"
           }`}
         >
           Test PASS (Perinatal)
           {historialPass.length > 0 && (
-            <span className="ml-1.5 text-[11px] bg-fuchsia-100 text-fuchsia-700 font-bold px-1.5 py-0.5 rounded-full">
+            <span className="ml-1.5 text-xs bg-blue-100 text-blue-700 font-bold px-1.5 py-0.5 rounded-full">
               {historialPass.length}
             </span>
           )}
@@ -595,13 +595,13 @@ export const HistorialView: React.FC<HistorialViewProps> = ({
           onClick={() => { setPestaña("psicosocial"); setConfirmarLimpiar(false); }}
           className={`shrink-0 whitespace-nowrap px-3 sm:px-4 py-2.5 sm:py-2 text-sm font-medium rounded-t-lg border-b-2 transition-all ${
             pestaña === "psicosocial"
-              ? "border-purple-600 text-purple-700 bg-purple-50/60"
+              ? "border-blue-600 text-blue-700 bg-blue-50/60"
               : "border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50"
           }`}
         >
-          🤰 PSICOSOCIAL (Gestantes)
+          PSICOSOCIAL (Gestantes)
           {historialPsicosocial.length > 0 && (
-            <span className="ml-1.5 text-[11px] bg-purple-100 text-purple-700 font-bold px-1.5 py-0.5 rounded-full">
+            <span className="ml-1.5 text-xs bg-blue-100 text-blue-700 font-bold px-1.5 py-0.5 rounded-full">
               {historialPsicosocial.length}
             </span>
           )}
@@ -610,7 +610,7 @@ export const HistorialView: React.FC<HistorialViewProps> = ({
 
       {/* Lista */}
       {lista.length === 0 ? (
-        <div className="text-center py-16 text-slate-400">
+        <div className="text-center py-16 text-slate-500">
           <ClipboardList className="w-10 h-10 mx-auto mb-3 opacity-40" />
           <p className="text-sm font-medium">No hay resultados guardados</p>
           <p className="text-xs mt-1">

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { CheckCircle, ShieldAlert, FileSpreadsheet, Database, ChevronDown, ChevronUp, Layers, Info } from "lucide-react";
+import { AlertTriangle, CheckCircle, ShieldAlert, FileSpreadsheet, Database, ChevronDown, ChevronUp, Layers, Info } from "lucide-react";
 import { BRIEF_ESCALAS_METADATA, ITEMS_VALIDEZ_BRIEF } from "../data/testsData";
 
 export interface BriefResultData {
@@ -46,13 +46,13 @@ export const BriefResultView: React.FC<BriefResultViewProps> = ({ data, onReset 
       {/* Cabecera */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-5 border-b border-slate-100 gap-4">
         <div>
-          <span className="text-xs font-semibold tracking-wider uppercase text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-full">
+          <span className="text-sm font-semibold text-blue-700">
             Resultado Test BRIEF (Funciones Ejecutivas)
           </span>
           <h2 className="text-xl font-bold text-slate-900 mt-2 flex items-center gap-2">
             <span>{data.paciente || "Paciente Anónimo"}</span>
             {data.genero && (
-              <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
+              <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 whitespace-nowrap shrink-0">
                 {data.genero.toUpperCase() === "M" ? "Hombre" : data.genero.toUpperCase() === "F" ? "Mujer" : data.genero}
                 {data.edad ? ` • ${data.edad} años` : ""}
               </span>
@@ -70,7 +70,7 @@ export const BriefResultView: React.FC<BriefResultViewProps> = ({ data, onReset 
           ) : (
             <span className="inline-flex items-center gap-1.5 text-xs font-medium bg-slate-100 text-slate-600 px-3 py-1.5 rounded-full border border-slate-200">
               <Database className="w-3.5 h-3.5" />
-              Sheets no sincronizado
+              Pendiente de enviar a Sheets
             </span>
           )}
         </div>
@@ -82,7 +82,7 @@ export const BriefResultView: React.FC<BriefResultViewProps> = ({ data, onReset 
           <ShieldAlert className="w-6 h-6 text-amber-600 shrink-0 mt-0.5" />
           <div className="text-xs space-y-1">
             <h4 className="font-bold text-sm text-amber-900">
-              ⚠️ ALERTA CLÍNICA ACTIVADA: Se sugiere entrevista de profundización
+              Alerta clínica: se sugiere entrevista de profundización
             </h4>
             <p className="text-amber-800">
               El protocolo superó los umbrales de control de validez (Negatividad N ≥ 3 o Infrecuencia F ≥ 2). Puede reflejar un sesgo de respuesta negativo o dificultades atípicas que requieren triangulación clínica.
@@ -102,22 +102,22 @@ export const BriefResultView: React.FC<BriefResultViewProps> = ({ data, onReset 
       {/* Métricas Principales (Totales y Subtotales) */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
-          <span className="text-xs font-medium text-slate-500 uppercase">Subtotal 1 (Ítems 1-38)</span>
-          <p className="text-2xl font-bold text-slate-900 mt-1">{subtotal_1_38} <span className="text-xs font-normal text-slate-400">pts</span></p>
+          <span className="text-xs font-medium text-slate-500">Subtotal 1 (Ítems 1-38)</span>
+          <p className="text-2xl font-bold text-slate-900 mt-1">{subtotal_1_38} <span className="text-xs font-normal text-slate-500">pts</span></p>
         </div>
         <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
-          <span className="text-xs font-medium text-slate-500 uppercase">Subtotal 2 (Ítems 39-75)</span>
-          <p className="text-2xl font-bold text-slate-900 mt-1">{subtotal_39_75} <span className="text-xs font-normal text-slate-400">pts</span></p>
+          <span className="text-xs font-medium text-slate-500">Subtotal 2 (Ítems 39-75)</span>
+          <p className="text-2xl font-bold text-slate-900 mt-1">{subtotal_39_75} <span className="text-xs font-normal text-slate-500">pts</span></p>
         </div>
         <div className="p-4 rounded-xl bg-blue-50 border border-blue-200">
-          <span className="text-xs font-semibold text-blue-700 uppercase">Puntuación Total General</span>
+          <span className="text-xs font-semibold text-blue-700">Puntuación Total General</span>
           <p className="text-3xl font-extrabold text-blue-900 mt-0.5">{total} <span className="text-xs font-normal text-blue-500">pts</span></p>
         </div>
       </div>
 
       {/* Indicadores de Validez N, I, F */}
       <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
-        <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 mb-3 flex items-center gap-1.5">
+        <h4 className="text-xs font-bold text-slate-700 mb-3 flex items-center gap-1.5">
           <Info className="w-4 h-4 text-slate-500" />
           Indicadores de Validez y Consistencia
         </h4>
@@ -130,8 +130,8 @@ export const BriefResultView: React.FC<BriefResultViewProps> = ({ data, onReset 
                 {validez.negatividad_N} / 10
               </span>
             </div>
-            <p className="text-[11px] text-slate-500">
-              {validez.negatividad_N >= 3 ? "⚠️ Alerta activada (≥3 respuestas máximas)" : "Rango esperado normal"}
+            <p className="text-xs text-slate-500">
+              {validez.negatividad_N >= 3 ? (<span className="inline-flex items-center gap-1 font-semibold text-rose-700"><AlertTriangle className="w-3.5 h-3.5" aria-hidden="true" />Alerta activada (≥3 respuestas máximas)</span>) : "Rango esperado normal"}
             </p>
           </div>
 
@@ -143,7 +143,7 @@ export const BriefResultView: React.FC<BriefResultViewProps> = ({ data, onReset 
                 {validez.inconsistencia_I} / 20
               </span>
             </div>
-            <p className="text-[11px] text-slate-500">Pares de inconsistencia evaluados</p>
+            <p className="text-xs text-slate-500">Pares de inconsistencia evaluados</p>
           </div>
 
           {/* F */}
@@ -154,8 +154,8 @@ export const BriefResultView: React.FC<BriefResultViewProps> = ({ data, onReset 
                 {validez.infrecuencia_F} / 5
               </span>
             </div>
-            <p className="text-[11px] text-slate-500">
-              {validez.infrecuencia_F >= 2 ? "⚠️ Alerta activada (≥2 respuestas máximas)" : "Rango esperado normal"}
+            <p className="text-xs text-slate-500">
+              {validez.infrecuencia_F >= 2 ? (<span className="inline-flex items-center gap-1 font-semibold text-rose-700"><AlertTriangle className="w-3.5 h-3.5" aria-hidden="true" />Alerta activada (≥2 respuestas máximas)</span>) : "Rango esperado normal"}
             </p>
           </div>
         </div>
@@ -163,7 +163,7 @@ export const BriefResultView: React.FC<BriefResultViewProps> = ({ data, onReset 
 
       {/* Gráfico y Desglose de las 9 Escalas Clínicas */}
       <div className="space-y-3">
-        <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+        <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
           <Layers className="w-4 h-4 text-blue-600" />
           Puntuaciones en las 9 Escalas Clínicas
         </h3>
@@ -183,10 +183,10 @@ export const BriefResultView: React.FC<BriefResultViewProps> = ({ data, onReset 
                 <div className="flex justify-between items-baseline">
                   <div>
                     <h5 className="font-bold text-slate-800 text-sm">{meta.titulo}</h5>
-                    <p className="text-[11px] text-slate-500">{meta.descripcion}</p>
+                    <p className="text-xs text-slate-500">{meta.descripcion}</p>
                   </div>
-                  <span className="text-base font-extrabold text-slate-900 font-mono ml-2">
-                    {puntaje} <span className="text-[10px] text-slate-400 font-normal">pts</span>
+                  <span className="text-base font-extrabold text-slate-900 font-mono ml-2 shrink-0 whitespace-nowrap">
+                    {puntaje} <span className="text-xs text-slate-500 font-normal">pts</span>
                   </span>
                 </div>
 
@@ -212,7 +212,7 @@ export const BriefResultView: React.FC<BriefResultViewProps> = ({ data, onReset 
 
           {mostrarDetalleItems && (
             <div className="p-4 bg-white text-xs border-t border-slate-200">
-              <div className="flex items-center gap-4 mb-3 text-[11px] text-slate-500">
+              <div className="flex items-center gap-4 mb-3 text-xs text-slate-500">
                 <span className="flex items-center gap-1">
                   <span className="w-2.5 h-2.5 rounded-full bg-amber-400 inline-block" /> Ítem de validez (Negatividad o Infrecuencia)
                 </span>
@@ -228,11 +228,11 @@ export const BriefResultView: React.FC<BriefResultViewProps> = ({ data, onReset 
                     <div
                       key={num}
                       title={`Ítem ${num}: marcado ${resp}${esValidez ? " (Indicador de Validez)" : ""}`}
-                      className={`p-1 rounded text-[11px] font-mono border ${
+                      className={`p-1 rounded text-xs font-mono border ${
                         esValidez ? "bg-amber-50 border-amber-300 text-amber-900 font-bold" : "bg-slate-50 border-slate-200 text-slate-700"
                       }`}
                     >
-                      <div className="text-[9px] text-slate-400">#{num}</div>
+                      <div className="text-xs text-slate-500">#{num}</div>
                       <div>{resp}</div>
                     </div>
                   );

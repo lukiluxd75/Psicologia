@@ -12,9 +12,9 @@ interface HeaderProps {
 }
 
 const TABS = [
-  { id: "ocr", label: "Escaneo con Cámara / OCR", corto: "Escanear", Icon: Camera },
+  { id: "ocr", label: "Escanear test", corto: "Escanear", Icon: Camera },
   { id: "historial", label: "Historial", corto: "Historial", Icon: ClipboardList },
-  { id: "estadisticas", label: "Estadísticas / Jamovi", corto: "Estadísticas", Icon: BarChart3 },
+  { id: "estadisticas", label: "Estadísticas", corto: "Estadísticas", Icon: BarChart3 },
 ] as const;
 
 function horaCorta(d: Date) {
@@ -117,7 +117,7 @@ export const Header: React.FC<HeaderProps> = ({
           <div className="flex items-center justify-between gap-3">
             {/* Logo y título */}
             <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-              <div className="w-9 h-9 sm:w-10 sm:h-10 shrink-0 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-blue-500/20">
+              <div className="w-9 h-9 sm:w-10 sm:h-10 shrink-0 rounded-xl bg-blue-600 flex items-center justify-center text-white" aria-hidden="true">
                 <Brain className="w-5 h-5 sm:w-6 sm:h-6" />
               </div>
               <div className="min-w-0">
@@ -125,9 +125,6 @@ export const Header: React.FC<HeaderProps> = ({
                   <h1 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight leading-none truncate">
                     PsicoMetric AI
                   </h1>
-                  <span className="hidden sm:inline text-[11px] font-semibold bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
-                    v2.0
-                  </span>
                 </div>
                 <p className="hidden sm:block text-xs text-slate-500 mt-0.5">
                   Corrección Psicométrica Automatizada (AUDIT, BRIEF, PASS & PSICOSOCIAL)
@@ -148,7 +145,7 @@ export const Header: React.FC<HeaderProps> = ({
                     ? `API en línea · IA ${geminiConfig ? "configurada" : "sin GEMINI_API_KEY"} · Sheets ${
                         sheetsConfig ? "configurado" : "sin SPREADSHEET_ID"
                       }`
-                    : "Volver a verificar estado del backend"
+                    : "Volver a comprobar la conexión con el servidor"
                 }
                 aria-label="Estado del servidor"
                 className="flex items-center gap-1.5 text-xs p-2 sm:px-2.5 sm:py-1 rounded-full border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 transition"
@@ -156,36 +153,31 @@ export const Header: React.FC<HeaderProps> = ({
                 {backendStatus === "verificando" && (
                   <>
                     <RefreshCw className="w-3 h-3 animate-spin text-slate-500" />
-                    <span className="hidden sm:inline">Conectando...</span>
+                    <span className="hidden sm:inline">Conectando…</span>
                   </>
                 )}
                 {backendStatus === "online" && (
                   <>
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                    <span className="hidden sm:inline font-medium text-emerald-700">API En Línea</span>
+                    <span className="w-2 h-2 rounded-full bg-emerald-500" aria-hidden="true" />
+                    <span className="hidden sm:inline font-medium text-emerald-700">En línea</span>
                   </>
                 )}
                 {backendStatus === "offline" && (
                   <>
-                    <span className="w-2 h-2 rounded-full bg-red-500" />
-                    <span className="font-medium text-red-700">
-                      <span className="sm:hidden">Sin conexión</span>
-                      <span className="hidden sm:inline">API Desconectada</span>
-                    </span>
+                    <span className="w-2 h-2 rounded-full bg-rose-500" aria-hidden="true" />
+                    <span className="font-medium text-rose-700">Sin conexión</span>
                   </>
                 )}
               </button>
 
-              {backendStatus === "online" && (
-                <div className="hidden md:flex items-center gap-1.5 text-[11px] text-slate-600 bg-slate-100 px-2 py-1 rounded-md">
-                  <span title={geminiConfig ? "Gemini configurado" : "Falta GEMINI_API_KEY"}>
-                    IA: {geminiConfig ? "🟢" : "🟡"}
-                  </span>
-                  <span>•</span>
-                  <span title={sheetsConfig ? "Google Sheets configurado" : "Falta SPREADSHEET_ID"}>
-                    Sheets: {sheetsConfig ? "🟢" : "🟡"}
-                  </span>
-                </div>
+              {backendStatus === "online" && (!geminiConfig || !sheetsConfig) && (
+                <span
+                  title={[!geminiConfig && "Falta GEMINI_API_KEY", !sheetsConfig && "Falta SPREADSHEET_ID"].filter(Boolean).join(" · ")}
+                  className="hidden md:inline-flex items-center gap-1.5 text-xs font-medium text-amber-800 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-full"
+                >
+                  <span className="w-2 h-2 rounded-full bg-amber-500" aria-hidden="true" />
+                  {!geminiConfig ? "Lectura de fotos sin configurar" : "Google Sheets sin configurar"}
+                </span>
               )}
             </div>
           </div>
@@ -208,7 +200,7 @@ export const Header: React.FC<HeaderProps> = ({
                   <Icon className="w-4 h-4" />
                   <span>{label}</span>
                   {id === "historial" && totalHistorial > 0 && (
-                    <span className={`text-[11px] font-bold px-1.5 py-0.5 rounded-full ${badge(activo)}`}>
+                    <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full ${badge(activo)}`}>
                       {totalHistorial}
                     </span>
                   )}
@@ -232,7 +224,7 @@ export const Header: React.FC<HeaderProps> = ({
                 key={id}
                 onClick={() => setTabActiva(id)}
                 aria-current={activo ? "page" : undefined}
-                className={`relative flex flex-col items-center justify-center gap-0.5 py-2 min-h-14 text-[11px] font-medium transition ${
+                className={`relative flex flex-col items-center justify-center gap-0.5 py-2 min-h-14 text-xs font-medium transition ${
                   activo ? "text-blue-700" : "text-slate-500 active:bg-slate-100"
                 }`}
               >
@@ -240,7 +232,7 @@ export const Header: React.FC<HeaderProps> = ({
                 <span className="relative">
                   <Icon className="w-5 h-5" strokeWidth={activo ? 2.4 : 2} />
                   {id === "historial" && totalHistorial > 0 && (
-                    <span className="absolute -top-1.5 -right-3 min-w-4 h-4 px-1 rounded-full bg-blue-600 text-white text-[10px] font-bold leading-4 text-center">
+                    <span className="absolute -top-1.5 -right-3 min-w-4 h-4 px-1 rounded-full bg-blue-600 text-white text-[11px] font-bold leading-4 text-center">
                       {totalHistorial > 99 ? "99+" : totalHistorial}
                     </span>
                   )}

@@ -119,47 +119,47 @@ export const BRIEF_ESCALAS_METADATA: Record<string, { titulo: string; descripcio
   inhibicion: {
     titulo: "Inhibición",
     descripcion: "Control de impulsos y capacidad para frenar conductas inapropiadas.",
-    color: "bg-red-500",
+    color: "bg-blue-600",
   },
   flexibilidad: {
     titulo: "Flexibilidad",
     descripcion: "Capacidad para adaptarse a cambios e imprevistos.",
-    color: "bg-orange-500",
+    color: "bg-blue-600",
   },
   control_emocional: {
     titulo: "Control Emocional",
     descripcion: "Regulación de respuestas afectivas y tolerancia a la frustración.",
-    color: "bg-amber-500",
+    color: "bg-blue-600",
   },
   automonitoreo: {
     titulo: "Automonitoreo",
     descripcion: "Consciencia del propio comportamiento y su impacto en los demás.",
-    color: "bg-yellow-500",
+    color: "bg-blue-600",
   },
   iniciativa: {
     titulo: "Iniciativa",
     descripcion: "Comenzar tareas de forma autónoma y generar ideas.",
-    color: "bg-emerald-500",
+    color: "bg-blue-600",
   },
   memoria_trabajo: {
     titulo: "Memoria de Trabajo",
     descripcion: "Retener y manipular información mental para resolver tareas.",
-    color: "bg-teal-500",
+    color: "bg-blue-600",
   },
   planificacion_organizacion: {
     titulo: "Planificación y Organización",
     descripcion: "Anticipar metas, establecer pasos lógicos y priorizar.",
-    color: "bg-blue-500",
+    color: "bg-blue-600",
   },
   monitoreo_tareas: {
     titulo: "Monitoreo de Tareas",
     descripcion: "Seguimiento y verificación del propio desempeño en tareas.",
-    color: "bg-indigo-500",
+    color: "bg-blue-600",
   },
   organizacion_materiales: {
     titulo: "Organización de Materiales",
     descripcion: "Orden en el espacio de trabajo y cuidado de pertenencias.",
-    color: "bg-purple-500",
+    color: "bg-blue-600",
   },
 };
 
