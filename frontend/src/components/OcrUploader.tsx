@@ -10,6 +10,17 @@ const ETIQUETA_TEST: Record<TipoTest, string> = {
   PSICOSOCIAL: "Gestantes · 1 a 8",
 };
 
+const CLAVE_SEMESTRE = "ocr_semestre";
+const SEMESTRES = Array.from({ length: 10 }, (_, i) => String(i + 1));
+
+function leerSemestre(): string {
+  try {
+    return localStorage.getItem(CLAVE_SEMESTRE) ?? "";
+  } catch {
+    return "";
+  }
+}
+
 interface OcrUploaderProps {
   onResultadoAudit: (res: any) => void;
   onResultadoBrief: (res: any) => void;
@@ -32,6 +43,17 @@ export const OcrUploader: React.FC<OcrUploaderProps> = ({
   // Estado para subida múltiple del test PSICOSOCIAL (de 1 a 8 páginas o PDF)
   const [archivosPsicosocial, setArchivosPsicosocial] = useState<File[]>([]);
   const [previewsPsicosocial, setPreviewsPsicosocial] = useState<string[]>([]);
+
+  // Se recuerda entre tests: en una jornada se suele evaluar a un mismo semestre.
+  const [semestre, setSemestre] = useState<string>(leerSemestre);
+  const cambiarSemestre = (valor: string) => {
+    setSemestre(valor);
+    try {
+      localStorage.setItem(CLAVE_SEMESTRE, valor);
+    } catch {
+      // sin storage: el valor vale solo para esta sesión
+    }
+  };
 
   const [cargando, setCargando] = useState(false);
   const [etapaCarga, setEtapaCarga] = useState("");
@@ -110,6 +132,10 @@ export const OcrUploader: React.FC<OcrUploaderProps> = ({
       const formData = new FormData();
       const apiBase = import.meta.env.VITE_API_URL || "";
       let url = "";
+
+      if ((tipoTest === "AUDIT" || tipoTest === "BRIEF") && semestre) {
+        formData.append("semestre", semestre);
+      }
 
       if (tipoTest === "AUDIT") {
         formData.append("file", archivo1!);
@@ -197,6 +223,28 @@ export const OcrUploader: React.FC<OcrUploaderProps> = ({
             );
           })}
         </div>
+
+        {(tipoTest === "AUDIT" || tipoTest === "BRIEF") && (
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+            <label htmlFor="ocr-semestre" className="text-sm font-semibold text-slate-800">
+              Semestre del estudiante
+            </label>
+            <select
+              id="ocr-semestre"
+              value={semestre}
+              onChange={(e) => cambiarSemestre(e.target.value)}
+              className="min-h-11 sm:min-h-0 border border-slate-300 rounded-lg px-3 py-2 sm:py-1.5 text-sm bg-white"
+            >
+              <option value="">Sin indicar</option>
+              {SEMESTRES.map((s) => (
+                <option key={s} value={s}>
+                  {s}.º semestre
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-slate-500">Se usa para comparar AUDIT y BRIEF entre semestres. Queda elegido para los siguientes tests.</p>
+          </div>
+        )}
 
         {/* Zonas de subida según el test seleccionado */}
         {tipoTest !== "PSICOSOCIAL" ? (

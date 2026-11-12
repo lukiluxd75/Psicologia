@@ -120,6 +120,7 @@ function filaAudit(e: HistorialEntryAudit): Fila {
     "Puntaje Total": e.puntaje,
     Diagnóstico: e.diagnostico,
     ...columnasItems("AUDIT", e.respuestas),
+    Semestre: e.semestre ?? "",
   };
 }
 
@@ -144,6 +145,7 @@ function filaBrief(e: HistorialEntryBrief): Fila {
     "Total General": r.total,
     "Alerta Entrevista": r.validez?.alerta_entrevista ? "SÍ" : "NO",
     ...columnasItems("BRIEF", e.respuestas),
+    Semestre: e.semestre ?? "",
   };
 }
 

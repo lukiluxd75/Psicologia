@@ -12,6 +12,9 @@ import {
   type TipoTest,
 } from "../lib/jamovi";
 import { BarPlot, BoxViolinPlot, ChartCard, HistogramPlot } from "./jamovi/JamoviCharts";
+import { copiarHtml, tablaApaHtml } from "../lib/apa";
+import { TablaApa, TD, TH } from "./jamovi/TablasApa";
+import { CorrelacionView } from "./CorrelacionView";
 
 type Fuente = "sheets" | "local" | "combinado";
 
@@ -40,34 +43,6 @@ async function leerError(res: Response): Promise<string> {
 }
 
 /* ─── Tablas APA ──────────────────────────────────────────────────────── */
-
-const TH = "px-3 py-1.5 font-semibold text-slate-900 whitespace-nowrap";
-const TD = "px-3 py-1.5 tabular-nums text-slate-800 whitespace-nowrap";
-
-const TablaApa: React.FC<{ numero: number; titulo: string; nota?: string; children: React.ReactNode }> = ({
-  numero,
-  titulo,
-  nota,
-  children,
-}) => (
-  <figure className="space-y-1.5 min-w-0">
-    <figcaption className="text-sm">
-      <span className="font-bold text-slate-900">Tabla {numero}</span>
-      <br />
-      <span className="italic text-slate-800">{titulo}</span>
-    </figcaption>
-    <div className="overflow-x-auto">
-      <table className="w-full text-sm border-collapse border-y-2 border-slate-900 [&_thead_tr]:border-b [&_thead_tr]:border-slate-900">
-        {children}
-      </table>
-    </div>
-    {nota && (
-      <p className="text-xs text-slate-600">
-        <span className="italic">Nota.</span> {nota}
-      </p>
-    )}
-  </figure>
-);
 
 const TablaDescriptivas: React.FC<{ filas: Descriptiva[]; numero: number; total: number }> = ({ filas, numero, total }) => (
   <TablaApa
@@ -158,64 +133,11 @@ const TablaFiabilidad: React.FC<{ filas: Fiabilidad[]; numero: number }> = ({ fi
   </TablaApa>
 );
 
-/* ─── HTML para Word ──────────────────────────────────────────────────── */
-
-const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-
-function tablaApaHtml(numero: number, titulo: string, cabeceras: string[], filas: string[][], nota?: string): string {
-  const base = "font-family:'Times New Roman',serif;font-size:12pt;padding:2pt 8pt;";
-  const head = cabeceras
-    .map((h, i) => `<th style="${base}border-top:1px solid #000;border-bottom:1px solid #000;font-weight:normal;text-align:${i ? "center" : "left"}">${esc(h)}</th>`)
-    .join("");
-  const body = filas
-    .map(
-      (f, r) =>
-        `<tr>${f
-          .map(
-            (c, i) =>
-              `<td style="${base}text-align:${i ? "center" : "left"};${r === filas.length - 1 ? "border-bottom:1px solid #000;" : ""}">${esc(c)}</td>`
-          )
-          .join("")}</tr>`
-    )
-    .join("");
-  return (
-    `<p style="${base}padding:0;margin:12pt 0 0"><b>Tabla ${numero}</b></p>` +
-    `<p style="${base}padding:0;margin:0 0 6pt"><i>${esc(titulo)}</i></p>` +
-    `<table style="border-collapse:collapse">${`<thead><tr>${head}</tr></thead>`}<tbody>${body}</tbody></table>` +
-    (nota ? `<p style="${base}padding:0;margin:4pt 0 0"><i>Nota.</i> ${esc(nota)}</p>` : "")
-  );
-}
-
-async function copiarHtml(html: string, texto: string) {
-  if (navigator.clipboard && "ClipboardItem" in window) {
-    await navigator.clipboard.write([
-      new ClipboardItem({
-        "text/html": new Blob([html], { type: "text/html" }),
-        "text/plain": new Blob([texto], { type: "text/plain" }),
-      }),
-    ]);
-    return;
-  }
-  // Respaldo para navegadores sin Clipboard API (p. ej. HTTP sin TLS)
-  const div = document.createElement("div");
-  div.innerHTML = html;
-  div.style.position = "fixed";
-  div.style.left = "-9999px";
-  document.body.appendChild(div);
-  const rango = document.createRange();
-  rango.selectNodeContents(div);
-  const sel = window.getSelection();
-  sel?.removeAllRanges();
-  sel?.addRange(rango);
-  document.execCommand("copy");
-  sel?.removeAllRanges();
-  div.remove();
-}
-
 /* ─── Vista principal ─────────────────────────────────────────────────── */
 
 export const JamoviAnalyticsView: React.FC<{ historial: HistorialLocal }> = ({ historial }) => {
   const [tipo, setTipo] = useState<TipoTest>("AUDIT");
+  const [modo, setModo] = useState<"test" | "correlacion">("test");
   const [fuente, setFuente] = useState<Fuente>("sheets");
   const [recarga, setRecarga] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -345,36 +267,63 @@ export const JamoviAnalyticsView: React.FC<{ historial: HistorialLocal }> = ({ h
   const tablaBarra = datos?.frecuencias[barraActiva];
   const prefijo = `jamovi_${tipo.toLowerCase()}`;
 
+  const claseTab = (activa: boolean) =>
+    `px-3 py-1.5 rounded-lg text-sm font-medium border transition ${
+      activa ? "bg-slate-900 text-white border-slate-900" : "bg-white text-slate-700 border-slate-300 hover:bg-slate-50"
+    }`;
+
+  const pestanas = (
+    <div className="flex flex-wrap gap-2" role="tablist" aria-label="Módulo">
+      {MODULOS.map((m) => (
+        <button
+          key={m.id}
+          role="tab"
+          aria-selected={modo === "test" && tipo === m.id}
+          onClick={() => {
+            setAviso(null);
+            setFuente("sheets");
+            setTipo(m.id);
+            setModo("test");
+          }}
+          className={claseTab(modo === "test" && tipo === m.id)}
+        >
+          {m.etiqueta}
+        </button>
+      ))}
+      <button role="tab" aria-selected={modo === "correlacion"} onClick={() => setModo("correlacion")} className={claseTab(modo === "correlacion")}>
+        AUDIT × BRIEF por semestre
+      </button>
+    </div>
+  );
+
+  const encabezado = (
+    <div>
+      <h2 className="text-base font-bold text-slate-900">Estadísticas y gráficos estilo Jamovi</h2>
+      <p className="text-xs text-slate-500 mt-0.5">
+        Tablas en formato APA 7.ª ed. y gráficos listos para informes. Exporta el dataset codificado para abrirlo en Jamovi Desktop.
+      </p>
+    </div>
+  );
+
+  if (modo === "correlacion") {
+    return (
+      <div className="space-y-5">
+        <section className="bg-white border border-slate-200 rounded-xl p-4 space-y-4">
+          {encabezado}
+          {pestanas}
+        </section>
+        <CorrelacionView historial={historial} />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-5">
       {/* Barra de control */}
       <section className="bg-white border border-slate-200 rounded-xl p-4 space-y-4">
-        <div>
-          <h2 className="text-base font-bold text-slate-900">Estadísticas y gráficos estilo Jamovi</h2>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Tablas en formato APA 7.ª ed. y gráficos listos para informes. Exporta el dataset codificado para abrirlo en Jamovi Desktop.
-          </p>
-        </div>
+        {encabezado}
 
-        <div className="flex flex-wrap gap-2" role="tablist" aria-label="Módulo">
-          {MODULOS.map((m) => (
-            <button
-              key={m.id}
-              role="tab"
-              aria-selected={tipo === m.id}
-              onClick={() => {
-                setAviso(null);
-                setFuente("sheets");
-                setTipo(m.id);
-              }}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition ${
-                tipo === m.id ? "bg-slate-900 text-white border-slate-900" : "bg-white text-slate-700 border-slate-300 hover:bg-slate-50"
-              }`}
-            >
-              {m.etiqueta}
-            </button>
-          ))}
-        </div>
+        {pestanas}
 
         <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
           <label className="flex items-center gap-2 text-sm text-slate-700">

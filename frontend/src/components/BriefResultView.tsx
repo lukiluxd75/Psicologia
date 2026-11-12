@@ -6,6 +6,7 @@ export interface BriefResultData {
   paciente: string;
   edad?: number;
   genero?: string;
+  semestre?: string;
   respuestas?: number[];
   resultados: {
     escalas: {
@@ -55,6 +56,7 @@ export const BriefResultView: React.FC<BriefResultViewProps> = ({ data, onReset 
               <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 whitespace-nowrap shrink-0">
                 {data.genero.toUpperCase() === "M" ? "Hombre" : data.genero.toUpperCase() === "F" ? "Mujer" : data.genero}
                 {data.edad ? ` • ${data.edad} años` : ""}
+                {data.semestre ? ` • ${data.semestre}.º semestre` : ""}
               </span>
             )}
           </h2>

@@ -1,8 +1,8 @@
 import config  # Carga .env antes que todo
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
-from services import gemini_service, scoring_service, sheets_service, analytics_service
+from services import gemini_service, scoring_service, sheets_service, analytics_service, correlacion_service
 from typing import List, Optional
 
 app = FastAPI(title="API Corrector Psicométrico")
@@ -36,6 +36,7 @@ class AuditManualRequest(BaseModel):
     edad: int = Field(..., example=30)
     genero: str = Field(..., example="M")
     respuestas: List[int] = Field(..., min_items=10, max_items=10, example=[0, 1, 2, 0, 3, 1, 0, 2, 1, 0])
+    semestre: Optional[str] = ""
     guardar_sheets: Optional[bool] = False
 
 
@@ -44,6 +45,7 @@ class BriefManualRequest(BaseModel):
     edad: int = Field(..., example=28)
     genero: str = Field(..., example="F")
     respuestas: List[int] = Field(..., min_items=75, max_items=75)
+    semestre: Optional[str] = ""
     guardar_sheets: Optional[bool] = False
 
 
@@ -74,8 +76,14 @@ def health_check():
     }
 
 
+def _semestre(valor) -> str:
+    """Semestre tal como se guarda en Sheets ("8"), o "" si no se indicó o no es válido."""
+    n = correlacion_service.parsear_semestre(valor)
+    return str(n) if n else ""
+
+
 @app.post("/api/upload/audit")
-async def procesar_test_audit(file: UploadFile = File(...)):
+async def procesar_test_audit(file: UploadFile = File(...), semestre: str = Form("")):
     # 1. Extraer datos con Gemini
     datos_extraidos = await gemini_service.extraer_datos_test(file, "AUDIT")
     
@@ -105,11 +113,13 @@ async def procesar_test_audit(file: UploadFile = File(...)):
     ]
     
     # 5. Guardar en Google Sheets
-    guardado = sheets_service.guardar_resultado_excel("AUDIT", fila_excel, items=respuestas)
+    semestre = _semestre(semestre)
+    guardado = sheets_service.guardar_resultado_excel("AUDIT", fila_excel, items=respuestas, extras={"Semestre": semestre})
     
     return {
         "mensaje": "Test AUDIT procesado y guardado correctamente" if guardado else "Test AUDIT procesado (Sheets no sincronizado)",
         "paciente": nombre,
+        "semestre": semestre,
         "edad": edad,
         "genero": genero,
         "respuestas": respuestas,
@@ -120,7 +130,7 @@ async def procesar_test_audit(file: UploadFile = File(...)):
 
 
 @app.post("/api/upload/brief")
-async def procesar_test_brief(files: List[UploadFile] = File(...)):
+async def procesar_test_brief(files: List[UploadFile] = File(...), semestre: str = Form("")):
     # Verificación de seguridad
     if len(files) != 2:
         raise HTTPException(status_code=400, detail="Se requieren exactamente 2 imágenes para el test BRIEF (Página 1 y Página 2).")
@@ -162,11 +172,13 @@ async def procesar_test_brief(files: List[UploadFile] = File(...)):
     ]
     
     # 4. Guardar en Google Sheets
-    guardado = sheets_service.guardar_resultado_excel("BRIEF", fila_excel, items=respuestas)
+    semestre = _semestre(semestre)
+    guardado = sheets_service.guardar_resultado_excel("BRIEF", fila_excel, items=respuestas, extras={"Semestre": semestre})
     
     return {
         "mensaje": "Test BRIEF procesado y guardado correctamente" if guardado else "Test BRIEF procesado (Sheets no sincronizado)",
         "paciente": nombre,
+        "semestre": semestre,
         "edad": edad,
         "genero": genero,
         "respuestas": respuestas,
@@ -189,11 +201,14 @@ def procesar_test_audit_manual(req: AuditManualRequest):
             puntaje_total,
             diagnostico
         ]
-        guardado = sheets_service.guardar_resultado_excel("AUDIT", fila_excel, items=req.respuestas)
+        guardado = sheets_service.guardar_resultado_excel(
+            "AUDIT", fila_excel, items=req.respuestas, extras={"Semestre": _semestre(req.semestre)}
+        )
 
     return {
         "mensaje": "Test AUDIT calculado con éxito",
         "paciente": req.nombre,
+        "semestre": _semestre(req.semestre),
         "edad": req.edad,
         "genero": req.genero,
         "respuestas": req.respuestas,
@@ -227,11 +242,14 @@ def procesar_test_brief_manual(req: BriefManualRequest):
             resultados["total"],
             "SÍ" if resultados["validez"]["alerta_entrevista"] else "NO"
         ]
-        guardado = sheets_service.guardar_resultado_excel("BRIEF", fila_excel, items=req.respuestas)
+        guardado = sheets_service.guardar_resultado_excel(
+            "BRIEF", fila_excel, items=req.respuestas, extras={"Semestre": _semestre(req.semestre)}
+        )
 
     return {
         "mensaje": "Test BRIEF calculado con éxito",
         "paciente": req.nombre,
+        "semestre": _semestre(req.semestre),
         "edad": req.edad,
         "genero": req.genero,
         "respuestas": req.respuestas,
@@ -500,6 +518,41 @@ def exportar_jamovi_local(
     tipo = _tipo_valido(tipo_test)
     filas = (sheets_service.obtener_registros_hoja(tipo) if incluir_sheets else []) + payload.registros
     return _respuesta_export(tipo, filas, incluir_nombres, formato.lower())
+
+
+# ---------------------------------------------------------------------------
+# Estudio correlacional AUDIT–BRIEF por semestre
+# ---------------------------------------------------------------------------
+
+class RegistrosCorrelacion(BaseModel):
+    audit: List[dict] = Field(default_factory=list)
+    brief: List[dict] = Field(default_factory=list)
+
+
+def _filas_correlacion(payload: RegistrosCorrelacion, incluir_sheets: bool):
+    audit = sheets_service.obtener_registros_hoja("AUDIT") if incluir_sheets else []
+    brief = sheets_service.obtener_registros_hoja("BRIEF") if incluir_sheets else []
+    return audit + payload.audit, brief + payload.brief
+
+
+@app.post("/api/correlacion/audit-brief")
+def correlacion_audit_brief(
+    payload: RegistrosCorrelacion, incluir_sheets: bool = True, semestre_a: int = 1, semestre_b: int = 8
+):
+    """Empareja el AUDIT y el BRIEF de cada estudiante y los correlaciona por semestre."""
+    audit, brief = _filas_correlacion(payload, incluir_sheets)
+    return correlacion_service.generar_correlacion(audit, brief, semestre_a, semestre_b)
+
+
+@app.post("/api/correlacion/audit-brief/csv")
+def correlacion_audit_brief_csv(payload: RegistrosCorrelacion, incluir_sheets: bool = True, incluir_nombres: bool = False):
+    audit, brief = _filas_correlacion(payload, incluir_sheets)
+    contenido = correlacion_service.generar_csv_correlacion(audit, brief, incluir_nombres=incluir_nombres)
+    return Response(
+        content=contenido.encode("utf-8"),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": 'attachment; filename="jamovi_audit_brief_por_estudiante.csv"'},
+    )
 
 
 # Configuración para Despliegue en Producción (servir frontend compilado si existe)

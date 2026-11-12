@@ -82,13 +82,22 @@ CABECERAS_BASE = {
 }
 
 
+# Columnas agregadas después de los ítems: las hojas antiguas las reciben a la derecha
+# sin desordenar lo ya guardado.
+CABECERAS_EXTRA = {
+    "AUDIT": ["Semestre"],
+    "BRIEF": ["Semestre"],
+}
+
+
 def cabecera_item(numero: int) -> str:
     return f"Ítem {numero}"
 
 
 def cabeceras_completas(tipo_test: str) -> list:
     base = CABECERAS_BASE.get(tipo_test, ["Datos"])
-    return base + [cabecera_item(n) for n in ITEMS_POR_TEST.get(tipo_test, [])]
+    items = [cabecera_item(n) for n in ITEMS_POR_TEST.get(tipo_test, [])]
+    return base + items + CABECERAS_EXTRA.get(tipo_test, [])
 
 
 def columnas_items(tipo_test: str, respuestas) -> list:
@@ -123,10 +132,11 @@ def _obtener_o_crear_hoja(documento, tipo_test: str):
         nueva_hoja.append_row(headers)
         return nueva_hoja
 
-def guardar_resultado_excel(tipo_test: str, datos_fila: list, items=None):
+def guardar_resultado_excel(tipo_test: str, datos_fila: list, items=None, extras: dict | None = None):
     """
     Inserta una nueva fila en la pestaña del test. Si se pasan `items` (respuestas ítem por ítem),
-    se agregan al final, alineados con las cabeceras "Ítem N".
+    se agregan al final, alineados con las cabeceras "Ítem N". `extras` llena las columnas de
+    CABECERAS_EXTRA (p. ej. {"Semestre": "8"}).
     """
     try:
         if not SPREADSHEET_ID:
@@ -144,6 +154,10 @@ def guardar_resultado_excel(tipo_test: str, datos_fila: list, items=None):
             base = CABECERAS_BASE.get(tipo_test, [])
             fila += [""] * (len(base) - len(fila))
             fila += columnas_items(tipo_test, items)
+        if extras:
+            base = CABECERAS_BASE.get(tipo_test, [])
+            fila += [""] * (len(base) + len(ITEMS_POR_TEST.get(tipo_test, [])) - len(fila))
+            fila += [extras.get(h, "") for h in CABECERAS_EXTRA.get(tipo_test, [])]
 
         # Inserta la fila al final del documento
         hoja.append_row(fila)

@@ -12,7 +12,7 @@ import {
   type FilaFrecuencia,
 } from "../../lib/jamovi";
 
-const FUENTE = "Arial, Helvetica, sans-serif";
+export const FUENTE = "Arial, Helvetica, sans-serif";
 
 /* ─── Contenedor con botón de descarga PNG ─────────────────────────────── */
 
@@ -62,13 +62,13 @@ export const ChartCard: React.FC<{
   );
 };
 
-const SinDatos: React.FC = () => (
+export const SinDatos: React.FC = () => (
   <p className="text-sm text-slate-500 py-10 text-center">No hay datos suficientes para este gráfico.</p>
 );
 
 /* ─── Ejes compartidos ────────────────────────────────────────────────── */
 
-function EjeY({ ticks, y, x0, x1, etiqueta }: { ticks: number[]; y: (v: number) => number; x0: number; x1: number; etiqueta: string }) {
+export function EjeY({ ticks, y, x0, x1, etiqueta }: { ticks: number[]; y: (v: number) => number; x0: number; x1: number; etiqueta: string }) {
   const yMid = (y(ticks[0]) + y(ticks[ticks.length - 1])) / 2;
   return (
     <g fontFamily={FUENTE} fontSize={11} fill={JMV.tintaSuave}>
