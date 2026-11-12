@@ -3,8 +3,10 @@ import { AlertTriangle, Check, ClipboardCopy, Download, RefreshCw } from "lucide
 import { descargarBlob, filasDesdeHistorial, fmt, JMV, ticksBonitos, type HistorialLocal } from "../lib/jamovi";
 import { pendientesDe } from "../hooks/useSheetsSync";
 import { ChartCard, EjeY, FUENTE, SinDatos } from "./jamovi/JamoviCharts";
-import { copiarHtml, tablaApaHtml } from "../lib/apa";
-import { TablaApa, TD, TH } from "./jamovi/TablasApa";
+import { parrafoHtml, tablaApaHtml } from "../lib/apa";
+import { TablaApa, TD, TH, type CopiaTabla } from "./jamovi/TablasApa";
+import { avisar, avisarError, copiarConAviso, MSJ_DESCARGA } from "../lib/avisos";
+import { magnitudD } from "../lib/interpretacion";
 
 /* ─── Tipos de la respuesta del backend ───────────────────────────────── */
 
@@ -307,7 +309,9 @@ const Promedios: React.FC<{ grupos: Grupo[]; semestres: number[] }> = ({ grupos,
 
 /* ─── Texto de resultados ────────────────────────────────────────────── */
 
-function redactarResultados(d: Resultado): string[] {
+const significativa = (p: number | null | undefined) => p !== null && p !== undefined && p < 0.05;
+
+function frasesCorrelacion(d: Resultado): string[] {
   const frases: string[] = [];
   for (const g of d.grupos) {
     const c = g.correlacion;
@@ -321,6 +325,11 @@ function redactarResultados(d: Resultado): string[] {
         `${c.p !== null && c.p < 0.05 ? "estadísticamente significativa" : "no significativa"}.`
     );
   }
+  return frases;
+}
+
+function frasesComparacion(d: Resultado): string[] {
+  const frases: string[] = [];
   const cmp = d.comparacion;
   const etA = `${cmp.semestre_a}.º`;
   const etB = `${cmp.semestre_b}.º`;
@@ -341,6 +350,11 @@ function redactarResultados(d: Resultado): string[] {
         `${pTexto(cmp.correlaciones.p)}${cmp.correlaciones.p !== null && cmp.correlaciones.p < 0.05 ? "; la relación difiere entre semestres." : "; no hay evidencia de que la relación difiera entre semestres."}`
     );
   }
+  return frases;
+}
+
+function frasesPromedio(d: Resultado): string[] {
+  const frases: string[] = [];
   const pm = d.promedio_semestres;
   if (pm) {
     const homogeneo = pm.p_q === null || pm.p_q >= 0.05;
@@ -354,6 +368,79 @@ function redactarResultados(d: Resultado): string[] {
     );
   }
   return frases;
+}
+
+function redactarResultados(d: Resultado): string[] {
+  return [...frasesCorrelacion(d), ...frasesComparacion(d), ...frasesPromedio(d)];
+}
+
+/* ─── Interpretación de cada gráfico y tabla ─────────────────────────── */
+
+function interpretarDispersion(d: Resultado): string {
+  const frases = [...d.grupos, d.total]
+    .filter((g) => g.correlacion.r !== null)
+    .map((g) => {
+      const r = g.correlacion.r!;
+      const sentido =
+        Math.abs(r) < 0.1
+          ? "los puntos no siguen ninguna tendencia: el puntaje AUDIT no se asocia con el del BRIEF"
+          : r > 0
+            ? "la nube de puntos sube de izquierda a derecha: a mayor puntaje AUDIT, mayor puntaje total en el BRIEF"
+            : "la nube de puntos baja de izquierda a derecha: a mayor puntaje AUDIT, menor puntaje total en el BRIEF";
+      return `En ${g.etiqueta} (n = ${g.n}, r = ${sinCero(r)}, ${pTexto(g.correlacion.p)}) ${sentido}${
+        significativa(g.correlacion.p) ? "" : ", aunque la relación no es estadísticamente significativa"
+      }.`;
+    });
+  if (!frases.length) return "";
+  frases.push("Correlación no implica causalidad: el gráfico muestra asociación, no que un puntaje produzca el otro.");
+  return frases.join(" ");
+}
+
+function frasesDiferencia(d: Resultado): string[] {
+  const cmp = d.comparacion;
+  const gA = d.grupos.find((g) => g.semestre === cmp.semestre_a);
+  const gB = d.grupos.find((g) => g.semestre === cmp.semestre_b);
+  const frases: string[] = [];
+  for (const [nombre, prueba, clave] of [
+    ["AUDIT", cmp.audit, "audit"],
+    ["BRIEF (Total General)", cmp.brief, "brief"],
+  ] as const) {
+    if (!prueba || !gA || !gB) continue;
+    const mA = gA[clave].media;
+    const mB = gB[clave].media;
+    const mayor = mA !== null && mB !== null ? (mA > mB ? `${cmp.semestre_a}.º` : `${cmp.semestre_b}.º`) : null;
+    frases.push(
+      `En ${nombre}, ${cmp.semestre_a}.º semestre obtuvo M = ${fmt(mA)} y ${cmp.semestre_b}.º M = ${fmt(mB)}` +
+        (mayor ? ` (más alto en ${mayor})` : "") +
+        `; la diferencia ${significativa(prueba.p) ? "es" : "no es"} estadísticamente significativa ` +
+        `(t(${fmt(prueba.gl, 1)}) = ${fmt(prueba.t)}, ${pTexto(prueba.p)}), con un tamaño del efecto ${magnitudD(prueba.d)} (d = ${fmt(prueba.d)}).`
+    );
+  }
+  return frases;
+}
+
+function interpretarDescriptivosGrupo(grupos: Grupo[]): string {
+  return grupos
+    .map((g) => `${g.etiqueta} (n = ${g.n}): AUDIT M = ${fmt(g.audit.media)} (DE = ${fmt(g.audit.de)}), BRIEF M = ${fmt(g.brief.media)} (DE = ${fmt(g.brief.de)})`)
+    .join("; ")
+    .concat(".");
+}
+
+function interpretarEscalas(total: Grupo): string {
+  const escalas = total.correlacion_escalas.filter((e) => e.r !== null);
+  if (!escalas.length) return "";
+  const sig = escalas.filter((e) => significativa(e.p)).sort((a, b) => Math.abs(b.r!) - Math.abs(a.r!));
+  const noSig = escalas.filter((e) => !significativa(e.p));
+  const frases: string[] = [];
+  if (sig.length)
+    frases.push(
+      `En ${total.etiqueta.toLowerCase()}, el AUDIT se relacionó significativamente con ${sig
+        .map((e) => `${e.etiqueta} (r = ${sinCero(e.r)}, ${e.interpretacion.toLowerCase()})`)
+        .join(", ")}.`
+    );
+  else frases.push(`En ${total.etiqueta.toLowerCase()}, el AUDIT no se relacionó significativamente con ninguna escala del BRIEF.`);
+  if (sig.length && noSig.length) frases.push(`No hubo relación significativa con ${noSig.map((e) => e.etiqueta).join(", ")}.`);
+  return frases.join(" ");
 }
 
 /* ─── Vista ──────────────────────────────────────────────────────────── */
@@ -424,8 +511,11 @@ export const CorrelacionView: React.FC<{ historial: HistorialLocal }> = ({ histo
       );
       if (!res.ok) throw new Error(`Error ${res.status}`);
       descargarBlob(await res.blob(), "jamovi_audit_brief_por_estudiante.csv");
+      avisar("Descarga iniciada: jamovi_audit_brief_por_estudiante.csv", MSJ_DESCARGA);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo descargar");
+      const msj = e instanceof Error ? e.message : "No se pudo descargar";
+      setError(msj);
+      avisarError("No se pudo descargar el CSV", msj);
     }
   };
 
@@ -434,59 +524,98 @@ export const CorrelacionView: React.FC<{ historial: HistorialLocal }> = ({ histo
   const filasTabla = datos ? [...grupos, datos.total] : [];
   const pm = datos?.promedio_semestres ?? null;
 
+  // Definición única de las 4 tablas: se usa para pintarlas, copiarlas una a una y copiarlas todas.
+  type DefTabla = { numero: number; titulo: string; nota: string; copia: CopiaTabla; interp: string };
+  const tablas: DefTabla[] =
+    datos && cmp
+      ? [
+          {
+            numero: 1,
+            titulo: "Estadísticos descriptivos de AUDIT y BRIEF por semestre",
+            nota: "M = media; DE = desviación estándar. BRIEF = Total General.",
+            copia: {
+              cabeceras: ["Grupo", "n", "AUDIT M", "AUDIT DE", "BRIEF M", "BRIEF DE"],
+              filas: filasTabla.map((g) => [g.etiqueta, String(g.n), fmt(g.audit.media), fmt(g.audit.de), fmt(g.brief.media), fmt(g.brief.de)]),
+            },
+            interp: interpretarDescriptivosGrupo(filasTabla),
+          },
+          {
+            numero: 2,
+            titulo: "Correlación entre AUDIT y BRIEF por semestre",
+            nota: NOTA_CORR + (pm ? ` ${notaPromedio(pm)}` : ""),
+            copia: {
+              cabeceras: ["Grupo", "n", "r", "IC 95 %", "p", "ρ", "p (ρ)", "Magnitud"],
+              filas: [
+                ...filasTabla.map((g) => {
+                  const c = g.correlacion;
+                  return [g.etiqueta, String(g.n), sinCero(c.r), ic(c), fmtP(c.p), sinCero(c.rho), fmtP(c.p_rho), c.interpretacion];
+                }),
+                ...(pm ? [["Promedio ponderado de semestres", String(pm.n), sinCero(pm.r), ic(pm), fmtP(pm.p), "—", "—", pm.interpretacion]] : []),
+              ],
+            },
+            interp: [...frasesCorrelacion(datos), ...frasesPromedio(datos)].join(" "),
+          },
+          {
+            numero: 3,
+            titulo: `Comparación entre ${cmp.semestre_a}.º (n = ${cmp.n_a}) y ${cmp.semestre_b}.º semestre (n = ${cmp.n_b})`,
+            nota: `t de Welch (sin asumir varianzas iguales); diferencia = ${cmp.semestre_a}.º − ${cmp.semestre_b}.º. Diferencia entre las correlaciones (z de Fisher): ${
+              cmp.correlaciones ? `z = ${fmt(cmp.correlaciones.z)}, ${pTexto(cmp.correlaciones.p)}` : "requiere al menos 4 estudiantes por semestre"
+            }.`,
+            copia: {
+              cabeceras: ["Variable", "Diferencia", "t", "gl", "p", "d de Cohen"],
+              filas: (
+                [
+                  ["AUDIT", cmp.audit],
+                  ["BRIEF (Total General)", cmp.brief],
+                ] as const
+              ).map(([nombre, t]) => [nombre, fmt(t?.diferencia), fmt(t?.t), fmt(t?.gl, 1), fmtP(t?.p), fmt(t?.d)]),
+            },
+            interp: [...frasesDiferencia(datos), ...frasesComparacion(datos).filter((f) => f.startsWith("Al comparar"))].join(" "),
+          },
+          {
+            numero: 4,
+            titulo: "Correlación del AUDIT con cada escala del BRIEF",
+            nota: "Valores = r de Pearson. * p < .05; ** p < .01.",
+            copia: {
+              cabeceras: ["Escala BRIEF", ...filasTabla.map((g) => g.etiqueta)],
+              filas: (datos.total.correlacion_escalas ?? []).map((e, i) => [
+                e.etiqueta,
+                ...filasTabla.map((g) => {
+                  const c = g.correlacion_escalas[i];
+                  return `${sinCero(c.r)}${estrellas(c.p)}`;
+                }),
+              ]),
+            },
+            interp: interpretarEscalas(datos.total),
+          },
+        ]
+      : [];
+
+  const propsTabla = (i: number) => {
+    const t = tablas[i];
+    return { numero: t.numero, titulo: t.titulo, nota: t.nota, copia: t.copia, interpretacion: t.interp };
+  };
+
   const copiarTablas = async () => {
-    if (!datos || !cmp) return;
-    let html = tablaApaHtml(
-      1,
-      "Estadísticos descriptivos de AUDIT y BRIEF por semestre",
-      ["Grupo", "n", "AUDIT M", "AUDIT DE", "BRIEF M", "BRIEF DE"],
-      filasTabla.map((g) => [g.etiqueta, String(g.n), fmt(g.audit.media), fmt(g.audit.de), fmt(g.brief.media), fmt(g.brief.de)]),
-      "M = media; DE = desviación estándar. BRIEF = Total General."
+    if (!datos || !tablas.length) return;
+    const resultados = redactarResultados(datos).join(" ");
+    const html =
+      tablas
+        .map((t) => tablaApaHtml(t.numero, t.titulo, t.copia.cabeceras, t.copia.filas, t.nota) + (t.interp ? parrafoHtml(t.interp) : ""))
+        .join("") + parrafoHtml(resultados);
+    const texto =
+      tablas
+        .map((t) => [`Tabla ${t.numero}`, t.titulo, t.copia.cabeceras.join("\t"), ...t.copia.filas.map((f) => f.join("\t")), t.interp].join("\n"))
+        .join("\n\n") + `\n\n${resultados}`;
+    const ok = await copiarConAviso(
+      html,
+      texto,
+      "Tablas y resultados copiados",
+      "Pégalos en Word con Ctrl+V: 4 tablas APA, cada una con su interpretación, y el párrafo de resultados."
     );
-    html += tablaApaHtml(
-      2,
-      "Correlación entre AUDIT y BRIEF por semestre",
-      ["Grupo", "n", "r", "IC 95 %", "p", "ρ", "p (ρ)", "Magnitud"],
-      [
-        ...filasTabla.map((g) => {
-          const c = g.correlacion;
-          return [g.etiqueta, String(g.n), sinCero(c.r), ic(c), fmtP(c.p), sinCero(c.rho), fmtP(c.p_rho), c.interpretacion];
-        }),
-        ...(pm ? [["Promedio ponderado de semestres", String(pm.n), sinCero(pm.r), ic(pm), fmtP(pm.p), "—", "—", pm.interpretacion]] : []),
-      ],
-      NOTA_CORR + (pm ? ` ${notaPromedio(pm)}` : "")
-    );
-    html += tablaApaHtml(
-      3,
-      `Comparación entre ${cmp.semestre_a}.º y ${cmp.semestre_b}.º semestre`,
-      ["Variable", "t", "gl", "p", "d de Cohen"],
-      [
-        ["AUDIT", fmt(cmp.audit?.t), fmt(cmp.audit?.gl, 1), fmtP(cmp.audit?.p), fmt(cmp.audit?.d)],
-        ["BRIEF", fmt(cmp.brief?.t), fmt(cmp.brief?.gl, 1), fmtP(cmp.brief?.p), fmt(cmp.brief?.d)],
-      ],
-      `t de Welch (sin asumir varianzas iguales). Diferencia entre las correlaciones (z de Fisher): z = ${fmt(cmp.correlaciones?.z)}, ${pTexto(cmp.correlaciones?.p)}.`
-    );
-    html += tablaApaHtml(
-      4,
-      "Correlación del AUDIT con cada escala del BRIEF",
-      ["Escala BRIEF", ...filasTabla.map((g) => g.etiqueta)],
-      (datos.total.correlacion_escalas ?? []).map((e, i) => [
-        e.etiqueta,
-        ...filasTabla.map((g) => {
-          const c = g.correlacion_escalas[i];
-          return `${sinCero(c.r)}${estrellas(c.p)}`;
-        }),
-      ]),
-      "Valores = r de Pearson. * p < .05; ** p < .01."
-    );
-    const texto = redactarResultados(datos).join(" ");
-    html += `<p style="font-family:'Times New Roman',serif;font-size:12pt;margin-top:12pt">${texto}</p>`;
-    try {
-      await copiarHtml(html, texto);
+    if (ok) {
       setCopiado(true);
       setTimeout(() => setCopiado(false), 2000);
-    } catch {
-      setError("El navegador no permitió copiar al portapapeles.");
     }
   };
 
@@ -619,6 +748,7 @@ export const CorrelacionView: React.FC<{ historial: HistorialLocal }> = ({ histo
             titulo="Diagrama de dispersión AUDIT × BRIEF"
             subtitulo="Un punto por estudiante · línea continua = recta de regresión de cada semestre · discontinua = muestra total"
             archivo="correlacion_audit_brief_dispersion.png"
+            interpretacion={interpretarDispersion(datos)}
           >
             <Dispersion personas={datos.personas} grupos={grupos} total={datos.total} semestres={datos.semestres} />
           </ChartCard>
@@ -627,12 +757,13 @@ export const CorrelacionView: React.FC<{ historial: HistorialLocal }> = ({ histo
             titulo="Promedios por semestre"
             subtitulo="Barras = media · líneas = ± 1 desviación estándar"
             archivo="correlacion_audit_brief_promedios.png"
+            interpretacion={frasesDiferencia(datos).join(" ")}
           >
             <Promedios grupos={grupos} semestres={datos.semestres} />
           </ChartCard>
 
           <section className="bg-white border border-slate-200 rounded-xl p-4 sm:p-5 space-y-6">
-            <TablaApa numero={1} titulo="Estadísticos descriptivos de AUDIT y BRIEF por semestre" nota="M = media; DE = desviación estándar. BRIEF = Total General.">
+            <TablaApa {...propsTabla(0)}>
               <thead>
                 <tr>
                   <th className={`${TH} text-left`}>Grupo</th>
@@ -657,11 +788,7 @@ export const CorrelacionView: React.FC<{ historial: HistorialLocal }> = ({ histo
               </tbody>
             </TablaApa>
 
-            <TablaApa
-              numero={2}
-              titulo="Correlación entre AUDIT y BRIEF por semestre"
-              nota={NOTA_CORR + (pm ? ` ${notaPromedio(pm)}` : "")}
-            >
+            <TablaApa {...propsTabla(1)}>
               <thead>
                 <tr>
                   <th className={`${TH} text-left`}>Grupo</th>
@@ -704,13 +831,7 @@ export const CorrelacionView: React.FC<{ historial: HistorialLocal }> = ({ histo
               </tbody>
             </TablaApa>
 
-            <TablaApa
-              numero={3}
-              titulo={`Comparación entre ${cmp.semestre_a}.º (n = ${cmp.n_a}) y ${cmp.semestre_b}.º semestre (n = ${cmp.n_b})`}
-              nota={`t de Welch (sin asumir varianzas iguales); diferencia = ${cmp.semestre_a}.º − ${cmp.semestre_b}.º. Diferencia entre las correlaciones (z de Fisher): ${
-                cmp.correlaciones ? `z = ${fmt(cmp.correlaciones.z)}, ${pTexto(cmp.correlaciones.p)}` : "requiere al menos 4 estudiantes por semestre"
-              }.`}
-            >
+            <TablaApa {...propsTabla(2)}>
               <thead>
                 <tr>
                   <th className={`${TH} text-left`}>Variable</th>
@@ -740,7 +861,7 @@ export const CorrelacionView: React.FC<{ historial: HistorialLocal }> = ({ histo
               </tbody>
             </TablaApa>
 
-            <TablaApa numero={4} titulo="Correlación del AUDIT con cada escala del BRIEF" nota="Valores = r de Pearson. * p < .05; ** p < .01.">
+            <TablaApa {...propsTabla(3)}>
               <thead>
                 <tr>
                   <th className={`${TH} text-left`}>Escala BRIEF</th>

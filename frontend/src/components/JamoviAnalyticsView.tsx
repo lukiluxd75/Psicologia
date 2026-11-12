@@ -12,8 +12,17 @@ import {
   type TipoTest,
 } from "../lib/jamovi";
 import { BarPlot, BoxViolinPlot, ChartCard, HistogramPlot } from "./jamovi/JamoviCharts";
-import { copiarHtml, tablaApaHtml } from "../lib/apa";
-import { TablaApa, TD, TH } from "./jamovi/TablasApa";
+import { parrafoHtml, tablaApaHtml } from "../lib/apa";
+import { TablaApa, TD, TH, type CopiaTabla } from "./jamovi/TablasApa";
+import { AvisosFlotantes } from "./jamovi/Avisos";
+import { avisar, avisarError, copiarConAviso, MSJ_DESCARGA } from "../lib/avisos";
+import {
+  interpretarBoxplot,
+  interpretarDescriptivas,
+  interpretarFiabilidad,
+  interpretarFrecuencias,
+  interpretarHistograma,
+} from "../lib/interpretacion";
 import { CorrelacionView } from "./CorrelacionView";
 
 type Fuente = "sheets" | "local" | "combinado";
@@ -44,11 +53,31 @@ async function leerError(res: Response): Promise<string> {
 
 /* ─── Tablas APA ──────────────────────────────────────────────────────── */
 
-const TablaDescriptivas: React.FC<{ filas: Descriptiva[]; numero: number; total: number }> = ({ filas, numero, total }) => (
+const copiaDescriptivas = (filas: Descriptiva[]): CopiaTabla => ({
+  cabeceras: ["Variable", "N", "Perdidos", "M", "Mdn", "DE", "Mín.", "Máx.", "Q1", "Q3"],
+  filas: filas.map((d) => [d.etiqueta, String(d.n), String(d.perdidos), fmt(d.media), fmt(d.mediana), fmt(d.de), fmt(d.minimo, 0), fmt(d.maximo, 0), fmt(d.q1), fmt(d.q3)]),
+});
+
+const notaDescriptivas = (total: number) =>
+  `N = ${total}. M = media; Mdn = mediana; DE = desviación estándar; Q1 = percentil 25; Q3 = percentil 75. Cuartiles calculados con el método tipo 7 de R (Jamovi).`;
+
+const copiaFrecuencias = (tabla: FilaFrecuencia[]): CopiaTabla => ({
+  cabeceras: ["Nivel / Categoría", "n", "% del total", "% acumulado"],
+  filas: tabla.map((r) => [r.categoria, String(r.frecuencia), r.porcentaje.toFixed(1), r.porcentaje_acumulado.toFixed(1)]),
+});
+
+const TablaDescriptivas: React.FC<{ filas: Descriptiva[]; numero: number; total: number; interpretacion: string }> = ({
+  filas,
+  numero,
+  total,
+  interpretacion,
+}) => (
   <TablaApa
     numero={numero}
     titulo="Estadísticos descriptivos"
-    nota={`N = ${total}. DE = desviación estándar; Q1 = percentil 25; Q3 = percentil 75. Cuartiles calculados con el método tipo 7 de R (Jamovi).`}
+    nota={notaDescriptivas(total)}
+    copia={copiaDescriptivas(filas)}
+    interpretacion={interpretacion}
   >
     <thead>
       <tr>
@@ -80,7 +109,12 @@ const TablaDescriptivas: React.FC<{ filas: Descriptiva[]; numero: number; total:
 );
 
 const TablaFrecuencias: React.FC<{ etiqueta: string; tabla: FilaFrecuencia[]; numero: number }> = ({ etiqueta, tabla, numero }) => (
-  <TablaApa numero={numero} titulo={`Frecuencias de ${etiqueta}`}>
+  <TablaApa
+    numero={numero}
+    titulo={`Frecuencias de ${etiqueta}`}
+    copia={copiaFrecuencias(tabla)}
+    interpretacion={interpretarFrecuencias(etiqueta, tabla)}
+  >
     <thead>
       <tr>
         <th className={`${TH} text-left`}>Nivel / Categoría</th>
@@ -108,8 +142,19 @@ const fmtAlfa = (v: number | null) => (v === null ? "—" : v.toFixed(2).replace
 const NOTA_FIABILIDAD =
   "α = alfa de Cronbach; k = número de ítems; n = casos con todos los ítems respondidos. Interpretación según George y Mallery (2003). Con muestras pequeñas el α es inestable.";
 
+const copiaFiabilidad = (filas: Fiabilidad[]): CopiaTabla => ({
+  cabeceras: ["Escala", "k", "n", "α", "Interpretación"],
+  filas: filas.map((f) => [f.etiqueta, String(f.k), String(f.n), fmtAlfa(f.alfa), f.interpretacion]),
+});
+
 const TablaFiabilidad: React.FC<{ filas: Fiabilidad[]; numero: number }> = ({ filas, numero }) => (
-  <TablaApa numero={numero} titulo="Fiabilidad por consistencia interna" nota={NOTA_FIABILIDAD}>
+  <TablaApa
+    numero={numero}
+    titulo="Fiabilidad por consistencia interna"
+    nota={NOTA_FIABILIDAD}
+    copia={copiaFiabilidad(filas)}
+    interpretacion={interpretarFiabilidad(filas)}
+  >
     <thead>
       <tr>
         <th className={`${TH} text-left`}>Escala</th>
@@ -206,9 +251,13 @@ export const JamoviAnalyticsView: React.FC<{ historial: HistorialLocal }> = ({ h
               body: JSON.stringify({ registros: filasLocales }),
             });
       if (!res.ok) throw new Error(await leerError(res));
-      descargarBlob(await res.blob(), `jamovi_${tipo.toLowerCase()}_dataset.${formato}`);
+      const nombre = `jamovi_${tipo.toLowerCase()}_dataset.${formato}`;
+      descargarBlob(await res.blob(), nombre);
+      avisar(`Descarga iniciada: ${nombre}`, MSJ_DESCARGA);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo descargar el dataset");
+      const msj = e instanceof Error ? e.message : "No se pudo descargar el dataset";
+      setError(msj);
+      avisarError("No se pudo descargar el dataset", msj);
     } finally {
       setDescargando(null);
     }
@@ -220,52 +269,57 @@ export const JamoviAnalyticsView: React.FC<{ historial: HistorialLocal }> = ({ h
   const hayFiabilidad = !!datos && datos.registros_con_items > 0;
   const primeraFrecuencia = hayFiabilidad ? 3 : 2;
 
-  const copiarTablas = async () => {
-    if (!datos) return;
-    const desc = datos.descriptivas;
-    let html = tablaApaHtml(
-      1,
-      `Estadísticos descriptivos: ${tipo}`,
-      ["Variable", "N", "Perdidos", "M", "Mdn", "DE", "Mín.", "Máx.", "Q1", "Q3"],
-      desc.map((d) => [d.etiqueta, String(d.n), String(d.perdidos), fmt(d.media), fmt(d.mediana), fmt(d.de), fmt(d.minimo, 0), fmt(d.maximo, 0), fmt(d.q1), fmt(d.q3)]),
-      `N = ${datos.total_registros}. M = media; Mdn = mediana; DE = desviación estándar; Q1 = percentil 25; Q3 = percentil 75.`
-    );
-    let texto = ["Variable\tN\tPerdidos\tM\tMdn\tDE\tMín.\tMáx.\tQ1\tQ3", ...desc.map((d) => [d.etiqueta, d.n, d.perdidos, fmt(d.media), fmt(d.mediana), fmt(d.de), fmt(d.minimo, 0), fmt(d.maximo, 0), fmt(d.q1), fmt(d.q3)].join("\t"))].join("\n");
-    if (hayFiabilidad) {
-      html += tablaApaHtml(
-        2,
-        "Fiabilidad por consistencia interna",
-        ["Escala", "k", "n", "α", "Interpretación"],
-        datos.fiabilidad.map((f) => [f.etiqueta, String(f.k), String(f.n), fmtAlfa(f.alfa), f.interpretacion]),
-        NOTA_FIABILIDAD
-      );
-      texto +=
-        "\n\nFiabilidad\nEscala\tk\tn\tα\tInterpretación\n" +
-        datos.fiabilidad.map((f) => `${f.etiqueta}\t${f.k}\t${f.n}\t${fmtAlfa(f.alfa)}\t${f.interpretacion}`).join("\n");
-    }
-    tablasFrecuencia.forEach(([, f], i) => {
-      html += tablaApaHtml(
-        i + primeraFrecuencia,
-        `Frecuencias de ${f.etiqueta}`,
-        ["Nivel / Categoría", "n", "% del total", "% acumulado"],
-        f.tabla.map((r) => [r.categoria, String(r.frecuencia), r.porcentaje.toFixed(1), r.porcentaje_acumulado.toFixed(1)])
-      );
-      texto += `\n\n${f.etiqueta}\nCategoría\tn\t%\t% acumulado\n` + f.tabla.map((r) => `${r.categoria}\t${r.frecuencia}\t${r.porcentaje.toFixed(1)}\t${r.porcentaje_acumulado.toFixed(1)}`).join("\n");
-    });
-    try {
-      await copiarHtml(html, texto);
-      setCopiado(true);
-      setTimeout(() => setCopiado(false), 2000);
-    } catch {
-      setError("El navegador no permitió copiar al portapapeles.");
-    }
-  };
-
   const escalasBox = datos ? datos.escalas_boxplot.map((v) => datos.descriptivas.find((d) => d.variable === v)).filter((d): d is Descriptiva => !!d) : [];
   const global = datos?.descriptivas.find((d) => d.variable === datos.puntaje_global);
   const barraActiva = datos && datos.frecuencias[varBarra]?.tabla.length ? varBarra : (datos?.categorica_principal ?? "");
   const tablaBarra = datos?.frecuencias[barraActiva];
   const prefijo = `jamovi_${tipo.toLowerCase()}`;
+  const interpDescriptivas = datos ? interpretarDescriptivas(datos.descriptivas, datos.total_registros, global) : "";
+
+  const copiarTablas = async () => {
+    if (!datos) return;
+    const bloques: { numero: number; titulo: string; copia: CopiaTabla; nota?: string; interp: string }[] = [
+      {
+        numero: 1,
+        titulo: `Estadísticos descriptivos: ${tipo}`,
+        copia: copiaDescriptivas(datos.descriptivas),
+        nota: notaDescriptivas(datos.total_registros),
+        interp: interpDescriptivas,
+      },
+    ];
+    if (hayFiabilidad)
+      bloques.push({
+        numero: 2,
+        titulo: "Fiabilidad por consistencia interna",
+        copia: copiaFiabilidad(datos.fiabilidad),
+        nota: NOTA_FIABILIDAD,
+        interp: interpretarFiabilidad(datos.fiabilidad),
+      });
+    tablasFrecuencia.forEach(([, f], i) =>
+      bloques.push({
+        numero: i + primeraFrecuencia,
+        titulo: `Frecuencias de ${f.etiqueta}`,
+        copia: copiaFrecuencias(f.tabla),
+        interp: interpretarFrecuencias(f.etiqueta, f.tabla),
+      })
+    );
+    const html = bloques
+      .map((b) => tablaApaHtml(b.numero, b.titulo, b.copia.cabeceras, b.copia.filas, b.nota) + (b.interp ? parrafoHtml(b.interp) : ""))
+      .join("");
+    const texto = bloques
+      .map((b) => [`Tabla ${b.numero}`, b.titulo, b.copia.cabeceras.join("\t"), ...b.copia.filas.map((f) => f.join("\t")), b.interp].join("\n"))
+      .join("\n\n");
+    const ok = await copiarConAviso(
+      html,
+      texto,
+      `${bloques.length} tablas copiadas`,
+      "Pégalas en Word con Ctrl+V: van en formato APA y con su interpretación debajo."
+    );
+    if (ok) {
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 2000);
+    }
+  };
 
   const claseTab = (activa: boolean) =>
     `px-3 py-1.5 rounded-lg text-sm font-medium border transition ${
@@ -313,12 +367,14 @@ export const JamoviAnalyticsView: React.FC<{ historial: HistorialLocal }> = ({ h
           {pestanas}
         </section>
         <CorrelacionView historial={historial} />
+        <AvisosFlotantes />
       </div>
     );
   }
 
   return (
     <div className="space-y-5">
+      <AvisosFlotantes />
       {/* Barra de control */}
       <section className="bg-white border border-slate-200 rounded-xl p-4 space-y-4">
         {encabezado}
@@ -413,13 +469,14 @@ export const JamoviAnalyticsView: React.FC<{ historial: HistorialLocal }> = ({ h
       {datos && datos.total_registros > 0 && (
         <>
           <section className="bg-white border border-slate-200 rounded-xl p-4 sm:p-5">
-            <TablaDescriptivas filas={datos.descriptivas} numero={1} total={datos.total_registros} />
+            <TablaDescriptivas filas={datos.descriptivas} numero={1} total={datos.total_registros} interpretacion={interpDescriptivas} />
           </section>
 
           <ChartCard
             titulo="Diagrama de cajas con violín y casos individuales"
             subtitulo="Caja = Q1–Q3 · línea = mediana · ■ = media · bigotes = 1.5 × RIC · puntos con jitter"
             archivo={`${prefijo}_boxplot.png`}
+            interpretacion={interpretarBoxplot(escalasBox)}
           >
             <BoxViolinPlot escalas={escalasBox} titulo={`${MODULOS.find((m) => m.id === tipo)!.nombre}: distribución por escala`} />
           </ChartCard>
@@ -429,6 +486,7 @@ export const JamoviAnalyticsView: React.FC<{ historial: HistorialLocal }> = ({ h
               titulo="Gráfico de barras de frecuencias"
               subtitulo="n (% del total) sobre cada barra"
               archivo={`${prefijo}_barras_${barraActiva}.png`}
+              interpretacion={interpretarFrecuencias(tablaBarra.etiqueta, tablaBarra.tabla)}
               acciones={
                 <select
                   value={barraActiva}
@@ -453,6 +511,7 @@ export const JamoviAnalyticsView: React.FC<{ historial: HistorialLocal }> = ({ h
               titulo="Histograma con curva de densidad"
               subtitulo={datos.cortes.length ? "Líneas discontinuas = puntos de corte clínicos" : undefined}
               archivo={`${prefijo}_histograma.png`}
+              interpretacion={interpretarHistograma(global, datos.cortes, datos.filas_crudas)}
             >
               <HistogramPlot variable={global} cortes={datos.cortes} titulo={`Distribución de ${global.etiqueta}`} />
             </ChartCard>

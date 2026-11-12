@@ -1,16 +1,21 @@
-import React, { useRef, useState } from "react";
-import { Camera } from "lucide-react";
+import React, { useEffect, useRef, useState } from "react";
+import { Camera, Check, ClipboardCopy } from "lucide-react";
 import {
   COLOR_CATEGORIA,
   JMV,
+  copiarSvgAlPortapapeles,
   densidadKernel,
   descargarSvgComoPng,
+  portapapelesDisponible,
+  svgAPng,
   fmt,
   jitter,
   ticksBonitos,
   type Descriptiva,
   type FilaFrecuencia,
 } from "../../lib/jamovi";
+import { avisar, avisarError, MSJ_DESCARGA } from "../../lib/avisos";
+import { Interpretacion } from "./TablasApa";
 
 export const FUENTE = "Arial, Helvetica, sans-serif";
 
@@ -21,19 +26,65 @@ export const ChartCard: React.FC<{
   subtitulo?: string;
   archivo: string;
   acciones?: React.ReactNode;
+  interpretacion?: string;
   children: React.ReactNode;
-}> = ({ titulo, subtitulo, archivo, acciones, children }) => {
+}> = ({ titulo, subtitulo, archivo, acciones, interpretacion, children }) => {
   const ref = useRef<HTMLDivElement>(null);
   const [error, setError] = useState<string | null>(null);
+  const [copiado, setCopiado] = useState(false);
+  const [imagenManual, setImagenManual] = useState<string | null>(null);
+
+  useEffect(() => () => {
+    if (imagenManual) URL.revokeObjectURL(imagenManual);
+  }, [imagenManual]);
+
+  const svgActual = () => ref.current?.querySelector("svg") ?? null;
+
+  // Si el navegador no deja escribir en el portapapeles (p. ej. la app abierta por http
+  // desde otra máquina), se muestra el PNG para copiarlo con clic derecho / pulsación larga.
+  const mostrarImagenManual = async (svg: SVGSVGElement) => {
+    const blob = await svgAPng(svg);
+    setImagenManual(URL.createObjectURL(blob));
+    avisar(
+      "Falta un paso para copiar",
+      "Este navegador no deja copiar directo. Haz clic derecho sobre la imagen que apareció debajo del gráfico → Copiar imagen (en el móvil, mantenla pulsada)."
+    );
+  };
+
+  const copiar = async () => {
+    const svg = svgActual();
+    if (!svg) return;
+    setError(null);
+    setImagenManual(null);
+    try {
+      if (!portapapelesDisponible()) {
+        await mostrarImagenManual(svg);
+        return;
+      }
+      await copiarSvgAlPortapapeles(svg);
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 2000);
+      avisar("Gráfico copiado", "Pégalo con Ctrl+V en Word, PowerPoint o WhatsApp.");
+    } catch {
+      try {
+        await mostrarImagenManual(svg);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "No se pudo copiar el gráfico");
+        avisarError("No se pudo copiar el gráfico", "Prueba con Descargar PNG o con otro navegador (Chrome o Edge).");
+      }
+    }
+  };
 
   const descargar = async () => {
-    const svg = ref.current?.querySelector("svg");
+    const svg = svgActual();
     if (!svg) return;
     setError(null);
     try {
       await descargarSvgComoPng(svg, archivo);
+      avisar(`Descarga iniciada: ${archivo}`, MSJ_DESCARGA);
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo descargar");
+      avisarError("No se pudo descargar el gráfico", "Usa el botón Copiar imagen.");
     }
   };
 
@@ -47,6 +98,20 @@ export const ChartCard: React.FC<{
         <div className="flex flex-wrap items-center gap-2">
           {acciones}
           <button
+            onClick={copiar}
+            className="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50"
+          >
+            {copiado ? (
+              <>
+                <Check className="w-3.5 h-3.5 text-emerald-600" /> Copiado
+              </>
+            ) : (
+              <>
+                <ClipboardCopy className="w-3.5 h-3.5" /> Copiar imagen
+              </>
+            )}
+          </button>
+          <button
             onClick={descargar}
             className="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50"
           >
@@ -57,6 +122,21 @@ export const ChartCard: React.FC<{
       <div ref={ref} className="overflow-x-auto">
         {children}
       </div>
+      {imagenManual && (
+        <div className="border border-slate-200 rounded-lg p-3 space-y-2 bg-slate-50">
+          <div className="flex items-start justify-between gap-2">
+            <p className="text-xs text-slate-600">
+              Este navegador no permite copiar automáticamente. Haz <b>clic derecho sobre la imagen → Copiar imagen</b> (en el
+              móvil, mantén pulsada la imagen).
+            </p>
+            <button onClick={() => setImagenManual(null)} className="text-xs text-slate-500 hover:text-slate-800 shrink-0">
+              Cerrar
+            </button>
+          </div>
+          <img src={imagenManual} alt={titulo} className="max-w-full bg-white border border-slate-200" />
+        </div>
+      )}
+      {interpretacion && <Interpretacion texto={interpretacion} />}
       {error && <p className="text-xs text-red-600">{error}</p>}
     </section>
   );

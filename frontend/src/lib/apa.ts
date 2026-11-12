@@ -26,8 +26,12 @@ export function tablaApaHtml(numero: number, titulo: string, cabeceras: string[]
   );
 }
 
+/** Párrafo en Times 12 para pegar debajo de una tabla en Word. */
+export const parrafoHtml = (texto: string) =>
+  `<p style="font-family:'Times New Roman',serif;font-size:12pt;margin:12pt 0 0">${esc(texto)}</p>`;
+
 export async function copiarHtml(html: string, texto: string) {
-  if (navigator.clipboard && "ClipboardItem" in window) {
+  if (window.isSecureContext && navigator.clipboard && "ClipboardItem" in window) {
     await navigator.clipboard.write([
       new ClipboardItem({
         "text/html": new Blob([html], { type: "text/html" }),
@@ -47,7 +51,8 @@ export async function copiarHtml(html: string, texto: string) {
   const sel = window.getSelection();
   sel?.removeAllRanges();
   sel?.addRange(rango);
-  document.execCommand("copy");
+  const ok = document.execCommand("copy");
   sel?.removeAllRanges();
   div.remove();
+  if (!ok) throw new Error("El navegador no permitió copiar");
 }

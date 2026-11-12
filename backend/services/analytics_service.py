@@ -45,8 +45,9 @@ ESQUEMAS: dict[str, dict[str, Any]] = {
         "puntaje_global": "puntaje_total",
         "categorica_principal": "diagnostico",
         "cortes": [
-            {"valor": 4, "etiqueta": "Riesgo (M ≥ 4)"},
-            {"valor": 5, "etiqueta": "Riesgo (H ≥ 5)"},
+            # "genero": el corte solo aplica a ese sexo (la interpretación cuenta por separado).
+            {"valor": 4, "etiqueta": "Riesgo (M ≥ 4)", "genero": "Femenino"},
+            {"valor": 5, "etiqueta": "Riesgo (H ≥ 5)", "genero": "Masculino"},
             {"valor": 16, "etiqueta": "Dependencia (≥ 16)"},
         ],
     },

@@ -49,9 +49,18 @@ export interface Analitica {
   escalas_boxplot: string[];
   puntaje_global: string;
   categorica_principal: string;
-  cortes: { valor: number; etiqueta: string }[];
+  cortes: Corte[];
   fiabilidad: Fiabilidad[];
   registros_con_items: number;
+  /** Registros normalizados (snake_case), sin nombres. */
+  filas_crudas?: Record<string, unknown>[];
+}
+
+/** Punto de corte clínico; con `genero` solo aplica a ese sexo (p. ej. AUDIT: mujeres ≥ 4, hombres ≥ 5). */
+export interface Corte {
+  valor: number;
+  etiqueta: string;
+  genero?: string;
 }
 
 /** Paleta jmv solicitada: azul acero, verde salvia, ámbar, coral. */
@@ -315,8 +324,26 @@ export function descargarBlob(blob: Blob, nombre: string) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+export async function descargarSvgComoPng(svg: SVGSVGElement, nombre: string, escala = 2): Promise<void> {
+  descargarBlob(await svgAPng(svg, escala), nombre);
+}
+
+/** El portapapeles solo existe en contextos seguros (https o localhost). */
+export const portapapelesDisponible = () =>
+  typeof window !== "undefined" && window.isSecureContext && !!navigator.clipboard?.write && "ClipboardItem" in window;
+
+/**
+ * Copia el gráfico como imagen PNG al portapapeles.
+ * Se pasa la promesa al ClipboardItem (no el blob resuelto) para que Safari
+ * conserve el gesto del usuario mientras se rasteriza.
+ */
+export async function copiarSvgAlPortapapeles(svg: SVGSVGElement, escala = 2): Promise<void> {
+  if (!portapapelesDisponible()) throw new Error("Portapapeles no disponible");
+  await navigator.clipboard.write([new ClipboardItem({ "image/png": svgAPng(svg, escala) })]);
+}
+
 /** Rasteriza un <svg> a PNG a escala 2x con fondo blanco. Los estilos deben ir como atributos. */
-export function descargarSvgComoPng(svg: SVGSVGElement, nombre: string, escala = 2): Promise<void> {
+export function svgAPng(svg: SVGSVGElement, escala = 2): Promise<Blob> {
   const { width, height } = svg.viewBox.baseVal;
   const clon = svg.cloneNode(true) as SVGSVGElement;
   clon.setAttribute("xmlns", "http://www.w3.org/2000/svg");
@@ -338,10 +365,8 @@ export function descargarSvgComoPng(svg: SVGSVGElement, nombre: string, escala =
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
       URL.revokeObjectURL(url);
       canvas.toBlob((b) => {
-        if (b) {
-          descargarBlob(b, nombre);
-          resolve();
-        } else reject(new Error("No se pudo generar el PNG"));
+        if (b) resolve(b);
+        else reject(new Error("No se pudo generar el PNG"));
       }, "image/png");
     };
     img.onerror = () => {
