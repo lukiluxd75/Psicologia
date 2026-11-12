@@ -8,6 +8,8 @@ Plataforma web clínica automatizada para psicólogos que procesa, califica y al
 
 Incluye persistencia automática en **Google Sheets** y un módulo de **Historial Clínico** local persistente en el navegador para consultar resultados con nombre y edad.
 
+Los resultados que no llegaron a guardarse en Sheets (p. ej. por falta de conexión) quedan pendientes en el historial de cada dispositivo y se reenvían solos cada 5 minutos mientras la app esté abierta, al recuperar la conexión y al volver a la app. El indicador "Sheets" de la barra superior muestra cuántos quedan pendientes; al tocarlo se envían en el momento.
+
 ---
 
 ## 🚀 Arquitectura Tecnológica

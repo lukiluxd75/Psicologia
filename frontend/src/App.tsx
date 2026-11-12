@@ -8,6 +8,7 @@ import { PsicosocialResultView } from "./components/PsicosocialResultView";
 import { HistorialView } from "./components/HistorialView";
 import { JamoviAnalyticsView } from "./components/JamoviAnalyticsView";
 import { useHistorial } from "./hooks/useHistorial";
+import { pendientesDe, useSheetsSync } from "./hooks/useSheetsSync";
 
 export function App() {
   const [tabActiva, setTabActiva] = useState<string>("ocr");
@@ -35,6 +36,8 @@ export function App() {
     limpiarPass,
     limpiarPsicosocial,
   } = useHistorial();
+
+  const { estado: estadoSync, sincronizar } = useSheetsSync(marcarSincronizados);
 
   const handleResultadoAudit = (res: any) => {
     limpiarResultados();
@@ -77,6 +80,15 @@ export function App() {
     [historialAudit, historialBrief, historialPass, historialPsicosocial]
   );
 
+  const pendientesSheets = useMemo(
+    () =>
+      pendientesDe("AUDIT", historialAudit).length +
+      pendientesDe("BRIEF", historialBrief).length +
+      pendientesDe("PASS", historialPass).length +
+      pendientesDe("PSICOSOCIAL", historialPsicosocial).length,
+    [historialAudit, historialBrief, historialPass, historialPsicosocial]
+  );
+
   const totalHistorial =
     historialAudit.length +
     historialBrief.length +
@@ -96,11 +108,14 @@ export function App() {
           }
         }}
         totalHistorial={totalHistorial}
+        pendientesSheets={pendientesSheets}
+        estadoSync={estadoSync}
+        onSincronizar={() => void sincronizar()}
       />
 
       {/* Contenido Principal */}
       <main
-        className={`flex-1 w-full mx-auto p-4 sm:p-6 space-y-6 ${
+        className={`flex-1 w-full mx-auto px-3 py-4 sm:p-6 space-y-6 ${
           tabActiva === "estadisticas" ? "max-w-6xl" : "max-w-4xl"
         }`}
       >
@@ -117,7 +132,8 @@ export function App() {
             eliminarBrief={eliminarBrief}
             eliminarPass={eliminarPass}
             eliminarPsicosocial={eliminarPsicosocial}
-            marcarSincronizados={marcarSincronizados}
+            sincronizar={sincronizar}
+            sincronizando={estadoSync.enviando}
             limpiarAudit={limpiarAudit}
             limpiarBrief={limpiarBrief}
             limpiarPass={limpiarPass}
@@ -163,10 +179,10 @@ export function App() {
       </main>
 
       {/* Pie de página */}
-      <footer className="border-t border-slate-200 bg-white py-4 text-center text-xs text-slate-500">
+      <footer className="border-t border-slate-200 bg-white py-4 mb-[calc(3.5rem+env(safe-area-inset-bottom))] sm:mb-0 text-center text-xs text-slate-500">
         <div className="max-w-4xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
           <span>Sistema de Corrección Psicométrica Automatizada • Psicología Clínica</span>
-          <span className="text-[11px] text-slate-400">FastAPI + React 19 + Gemini Flash + Google Sheets</span>
+          <span className="hidden sm:inline text-[11px] text-slate-400">FastAPI + React 19 + Gemini Flash + Google Sheets</span>
         </div>
       </footer>
     </div>

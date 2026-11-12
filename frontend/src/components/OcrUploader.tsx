@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { UploadCloud, X, AlertCircle, FileText, FileCheck, Image as ImageIcon } from "lucide-react";
+import { Camera, Images, X, AlertCircle, FileText, FileCheck, Image as ImageIcon } from "lucide-react";
 
 type TipoTest = "AUDIT" | "BRIEF" | "PASS" | "PSICOSOCIAL";
 
@@ -157,9 +157,9 @@ export const OcrUploader: React.FC<OcrUploaderProps> = ({
       : !archivo1 || (necesita2Imagenes && !archivo2));
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-6">
+    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 sm:p-6 space-y-5 sm:space-y-6">
       <div>
-        <h2 className="text-xl font-bold text-slate-900">Escaneo de Hojas Físicas con IA</h2>
+        <h2 className="text-lg sm:text-xl font-bold text-slate-900">Escaneo de Hojas Físicas con IA</h2>
         <p className="text-xs text-slate-500 mt-1">
           Toma fotografías con la cámara o sube documentos escaneados (imágenes o PDF). Google Gemini Flash extraerá las respuestas y el backend calculará los puntajes automáticamente.
         </p>
@@ -170,7 +170,7 @@ export const OcrUploader: React.FC<OcrUploaderProps> = ({
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {(["AUDIT", "BRIEF", "PASS", "PSICOSOCIAL"] as TipoTest[]).map((tipo) => {
             const activo = tipoTest === tipo;
-            let label = "";
+            let label: string;
             let activeColor = "bg-blue-600 text-white border-blue-600";
 
             if (tipo === "AUDIT") {
@@ -191,7 +191,7 @@ export const OcrUploader: React.FC<OcrUploaderProps> = ({
                 key={tipo}
                 type="button"
                 onClick={() => cambiarTipo(tipo)}
-                className={`py-2.5 px-3 rounded-xl border font-semibold text-xs transition text-center ${
+                className={`min-h-11 py-2.5 px-3 rounded-xl border font-semibold text-xs transition text-center ${
                   activo
                     ? `${activeColor} shadow-sm`
                     : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
@@ -239,7 +239,7 @@ export const OcrUploader: React.FC<OcrUploaderProps> = ({
         ) : (
           /* Subida dinámica de 1 a 8 páginas para PSICOSOCIAL */
           <div className="space-y-4">
-            <div className="p-4 rounded-xl border-2 border-dashed border-purple-300 hover:border-purple-400 bg-purple-50/40 transition">
+            <div className="p-3 sm:p-4 rounded-xl border-2 border-dashed border-purple-300 hover:border-purple-400 bg-purple-50/40 transition">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-2">
                 <div>
                   <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
@@ -258,20 +258,16 @@ export const OcrUploader: React.FC<OcrUploaderProps> = ({
               </div>
 
               {/* Botón de selección múltiple */}
-              <div className="text-center py-4 border-t border-purple-100 mt-3">
-                <UploadCloud className="w-8 h-8 text-purple-400 mx-auto mb-2" />
-                <p className="text-xs text-slate-600 font-medium">
-                  Toca para tomar foto con la cámara o seleccionar archivos (imágenes o PDF)
-                </p>
-                <input
-                  type="file"
-                  multiple
-                  accept="image/*,application/pdf"
-                  capture="environment"
-                  onChange={(e) => handleAgregarArchivosPsicosocial(e.target.files)}
-                  className="mt-3 block w-full text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-purple-600 file:text-white hover:file:bg-purple-700 cursor-pointer"
-                />
-              </div>
+              {archivosPsicosocial.length < 8 && (
+                <div className="pt-3 border-t border-purple-100 mt-3">
+                  <SelectorArchivo
+                    multiple
+                    accept="image/*,application/pdf"
+                    color="purple"
+                    onFiles={handleAgregarArchivosPsicosocial}
+                  />
+                </div>
+              )}
             </div>
 
             {/* Galería de páginas añadidas */}
@@ -329,7 +325,7 @@ export const OcrUploader: React.FC<OcrUploaderProps> = ({
                           type="button"
                           onClick={() => handleQuitarArchivoPsicosocial(idx)}
                           title="Quitar esta página"
-                          className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition"
+                          className="p-2 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition"
                         >
                           <X className="w-4 h-4" />
                         </button>
@@ -352,7 +348,7 @@ export const OcrUploader: React.FC<OcrUploaderProps> = ({
         <button
           type="submit"
           disabled={deshabilitado}
-          className={`w-full py-3 px-4 rounded-xl font-bold text-white shadow-md disabled:opacity-50 transition flex items-center justify-center gap-2 text-sm ${
+          className={`w-full py-3.5 sm:py-3 px-4 rounded-xl font-bold text-white shadow-md disabled:opacity-50 transition flex items-center justify-center gap-2 text-sm ${
             tipoTest === "PSICOSOCIAL"
               ? "bg-purple-600 hover:bg-purple-700 shadow-purple-500/20"
               : tipoTest === "PASS"
@@ -402,7 +398,7 @@ const FileDropZone: React.FC<{
 
   return (
     <div
-      className={`p-4 rounded-xl border-2 border-dashed border-slate-300 ${borderHover} bg-slate-50 transition`}
+      className={`p-3 sm:p-4 rounded-xl border-2 border-dashed border-slate-300 ${borderHover} bg-slate-50 transition`}
     >
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-2">
         <label className={`text-xs font-bold text-slate-700 flex items-center gap-1.5`}>
@@ -413,7 +409,7 @@ const FileDropZone: React.FC<{
           <button
             type="button"
             onClick={() => onChange(null)}
-            className="text-xs text-rose-600 hover:text-rose-800 flex items-center gap-1 self-start sm:self-auto"
+            className="text-xs text-rose-600 hover:text-rose-800 flex items-center gap-1 self-start sm:self-auto py-1.5 -my-1.5"
           >
             <X className="w-3.5 h-3.5" /> Quitar imagen
           </button>
@@ -425,10 +421,10 @@ const FileDropZone: React.FC<{
           <img
             src={preview}
             alt="Preview"
-            className="w-16 h-20 object-cover rounded border border-slate-200"
+            className="w-16 h-20 object-cover rounded border border-slate-200 shrink-0"
           />
-          <div className="text-xs space-y-1">
-            <p className="font-semibold text-slate-800">{archivo?.name}</p>
+          <div className="text-xs space-y-1 min-w-0">
+            <p className="font-semibold text-slate-800 truncate">{archivo?.name}</p>
             <p className="text-slate-500">
               {((archivo?.size || 0) / 1024).toFixed(1)} KB
             </p>
@@ -438,20 +434,56 @@ const FileDropZone: React.FC<{
           </div>
         </div>
       ) : (
-        <div className="text-center py-4">
-          <UploadCloud className="w-8 h-8 text-slate-400 mx-auto mb-2" />
-          <p className="text-xs text-slate-600 font-medium">
-            Toca para tomar foto o seleccionar archivo
-          </p>
-          <input
-            type="file"
+        <div className="pt-1">
+          <SelectorArchivo
             accept="image/*"
-            capture="environment"
-            onChange={(e) => onChange(e.target.files?.[0] || null)}
-            className="mt-3 block w-full text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700 cursor-pointer"
+            color={accentColor}
+            onFiles={(files) => onChange(files?.[0] || null)}
           />
         </div>
       )}
+    </div>
+  );
+};
+
+// ── Botones "Tomar foto" / "Galería" ───────────────────────────────
+// En muchos Android, un input con `capture` abre solo la cámara y no deja elegir de la galería,
+// por eso se ofrecen dos entradas separadas.
+const COLORES_BOTON: Record<string, string> = {
+  blue: "bg-blue-600 hover:bg-blue-700 active:bg-blue-800",
+  indigo: "bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800",
+  fuchsia: "bg-fuchsia-600 hover:bg-fuchsia-700 active:bg-fuchsia-800",
+  purple: "bg-purple-600 hover:bg-purple-700 active:bg-purple-800",
+};
+
+const SelectorArchivo: React.FC<{
+  accept: string;
+  multiple?: boolean;
+  color: string;
+  onFiles: (files: FileList | null) => void;
+}> = ({ accept, multiple, color, onFiles }) => {
+  const manejar = (e: React.ChangeEvent<HTMLInputElement>) => {
+    onFiles(e.target.files);
+    // Permite volver a elegir el mismo archivo después de quitarlo
+    e.target.value = "";
+  };
+
+  return (
+    <div className="grid grid-cols-2 gap-2">
+      <label
+        className={`flex items-center justify-center gap-2 min-h-12 px-3 rounded-xl text-white text-sm font-semibold cursor-pointer transition focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-slate-400 ${
+          COLORES_BOTON[color] || COLORES_BOTON.blue
+        }`}
+      >
+        <Camera className="w-5 h-5 shrink-0" />
+        <span>Tomar foto</span>
+        <input type="file" accept="image/*" capture="environment" onChange={manejar} className="sr-only" />
+      </label>
+      <label className="flex items-center justify-center gap-2 min-h-12 px-3 rounded-xl border border-slate-300 bg-white text-slate-700 text-sm font-semibold cursor-pointer transition hover:bg-slate-50 active:bg-slate-100 focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-slate-400">
+        <Images className="w-5 h-5 shrink-0" />
+        <span>{accept.includes("pdf") ? "Galería / PDF" : "Galería"}</span>
+        <input type="file" accept={accept} multiple={multiple} onChange={manejar} className="sr-only" />
+      </label>
     </div>
   );
 };

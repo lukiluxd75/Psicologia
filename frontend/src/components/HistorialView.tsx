@@ -21,7 +21,7 @@ import { AuditResultView } from "./AuditResultView";
 import { BriefResultView } from "./BriefResultView";
 import { PassResultView } from "./PassResultView";
 import { PsicosocialResultView } from "./PsicosocialResultView";
-import { filaDeEntrada } from "../lib/jamovi";
+import { pendientesDe, type ResultadoSync } from "../hooks/useSheetsSync";
 
 type TipoTest = "AUDIT" | "BRIEF" | "PASS" | "PSICOSOCIAL";
 const TIPO_POR_PESTAÑA: Record<"audit" | "brief" | "pass" | "psicosocial", TipoTest> = {
@@ -40,7 +40,8 @@ interface HistorialViewProps {
   eliminarBrief: (id: string) => void;
   eliminarPass: (id: string) => void;
   eliminarPsicosocial: (id: string) => void;
-  marcarSincronizados: (tipo: TipoTest, ids: string[]) => void;
+  sincronizar: (tipos?: TipoTest[]) => Promise<ResultadoSync>;
+  sincronizando: boolean;
   limpiarAudit: () => void;
   limpiarBrief: () => void;
   limpiarPass: () => void;
@@ -58,6 +59,10 @@ function formatFecha(iso: string) {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+function nombrePaciente(p: unknown): string | undefined {
+  return typeof p === "string" ? p : (p as { nombre?: string } | undefined)?.nombre;
 }
 
 /* ─── Tarjeta AUDIT ─────────────────────────────────────────────────────── */
@@ -83,8 +88,8 @@ const TarjetaAudit: React.FC<{
   return (
     <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs hover:border-slate-300 transition">
       {/* Fila de resumen */}
-      <div className="flex items-center gap-3 p-4">
-        <div className="w-9 h-9 rounded-full bg-blue-50 border border-blue-200 flex items-center justify-center shrink-0">
+      <div className="flex items-center gap-3 p-3 sm:p-4">
+        <div className="hidden sm:flex w-9 h-9 rounded-full bg-blue-50 border border-blue-200 items-center justify-center shrink-0">
           <User className="w-4 h-4 text-blue-600" />
         </div>
 
@@ -126,7 +131,7 @@ const TarjetaAudit: React.FC<{
           <button
             onClick={() => setExpandido((v) => !v)}
             title="Ver resultado completo"
-            className="p-1.5 rounded-lg hover:bg-blue-50 text-slate-500 hover:text-blue-600 transition"
+            className="p-2.5 sm:p-1.5 rounded-lg hover:bg-blue-50 text-slate-500 hover:text-blue-600 transition"
           >
             {expandido ? (
               <ChevronUp className="w-4 h-4" />
@@ -137,7 +142,7 @@ const TarjetaAudit: React.FC<{
           <button
             onClick={onEliminar}
             title="Eliminar del historial"
-            className="p-1.5 rounded-lg hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition"
+            className="p-2.5 sm:p-1.5 rounded-lg hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition"
           >
             <Trash2 className="w-4 h-4" />
           </button>
@@ -146,7 +151,7 @@ const TarjetaAudit: React.FC<{
 
       {/* Detalle expandido */}
       {expandido && (
-        <div className="border-t border-slate-100 p-4 bg-slate-50/50">
+        <div className="border-t border-slate-100 p-2 sm:p-4 bg-slate-50/50">
           <AuditResultView data={entry} />
         </div>
       )}
@@ -164,8 +169,8 @@ const TarjetaBrief: React.FC<{
 
   return (
     <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs hover:border-slate-300 transition">
-      <div className="flex items-center gap-3 p-4">
-        <div className="w-9 h-9 rounded-full bg-indigo-50 border border-indigo-200 flex items-center justify-center shrink-0">
+      <div className="flex items-center gap-3 p-3 sm:p-4">
+        <div className="hidden sm:flex w-9 h-9 rounded-full bg-indigo-50 border border-indigo-200 items-center justify-center shrink-0">
           <User className="w-4 h-4 text-indigo-600" />
         </div>
 
@@ -219,7 +224,7 @@ const TarjetaBrief: React.FC<{
           <button
             onClick={onEliminar}
             title="Eliminar del historial"
-            className="p-1.5 rounded-lg hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition"
+            className="p-2.5 sm:p-1.5 rounded-lg hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition"
           >
             <Trash2 className="w-4 h-4" />
           </button>
@@ -227,7 +232,7 @@ const TarjetaBrief: React.FC<{
       </div>
 
       {expandido && (
-        <div className="border-t border-slate-100 p-4 bg-slate-50/50">
+        <div className="border-t border-slate-100 p-2 sm:p-4 bg-slate-50/50">
           <BriefResultView data={entry} />
         </div>
       )}
@@ -263,8 +268,8 @@ const TarjetaPass: React.FC<{
 
   return (
     <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs hover:border-slate-300 transition">
-      <div className="flex items-center gap-3 p-4">
-        <div className="w-9 h-9 rounded-full bg-fuchsia-50 border border-fuchsia-200 flex items-center justify-center shrink-0">
+      <div className="flex items-center gap-3 p-3 sm:p-4">
+        <div className="hidden sm:flex w-9 h-9 rounded-full bg-fuchsia-50 border border-fuchsia-200 items-center justify-center shrink-0">
           <Baby className="w-4 h-4 text-fuchsia-600" />
         </div>
 
@@ -323,7 +328,7 @@ const TarjetaPass: React.FC<{
           <button
             onClick={onEliminar}
             title="Eliminar del historial"
-            className="p-1.5 rounded-lg hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition"
+            className="p-2.5 sm:p-1.5 rounded-lg hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition"
           >
             <Trash2 className="w-4 h-4" />
           </button>
@@ -331,7 +336,7 @@ const TarjetaPass: React.FC<{
       </div>
 
       {expandido && (
-        <div className="border-t border-slate-100 p-4 bg-slate-50/50">
+        <div className="border-t border-slate-100 p-2 sm:p-4 bg-slate-50/50">
           <PassResultView data={entry} />
         </div>
       )}
@@ -355,8 +360,8 @@ const TarjetaPsicosocial: React.FC<{
 
   return (
     <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs hover:border-slate-300 transition">
-      <div className="flex items-center gap-3 p-4">
-        <div className="w-9 h-9 rounded-full bg-purple-50 border border-purple-200 flex items-center justify-center shrink-0">
+      <div className="flex items-center gap-3 p-3 sm:p-4">
+        <div className="hidden sm:flex w-9 h-9 rounded-full bg-purple-50 border border-purple-200 items-center justify-center shrink-0">
           <Activity className="w-4 h-4 text-purple-600" />
         </div>
 
@@ -416,7 +421,7 @@ const TarjetaPsicosocial: React.FC<{
           <button
             onClick={onEliminar}
             title="Eliminar del historial"
-            className="p-1.5 rounded-lg hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition"
+            className="p-2.5 sm:p-1.5 rounded-lg hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition"
           >
             <Trash2 className="w-4 h-4" />
           </button>
@@ -424,7 +429,7 @@ const TarjetaPsicosocial: React.FC<{
       </div>
 
       {expandido && (
-        <div className="border-t border-slate-100 p-4 bg-slate-50/50">
+        <div className="border-t border-slate-100 p-2 sm:p-4 bg-slate-50/50">
           <PsicosocialResultView data={entry} />
         </div>
       )}
@@ -442,7 +447,8 @@ export const HistorialView: React.FC<HistorialViewProps> = ({
   eliminarBrief,
   eliminarPass,
   eliminarPsicosocial,
-  marcarSincronizados,
+  sincronizar,
+  sincronizando,
   limpiarAudit,
   limpiarBrief,
   limpiarPass,
@@ -450,7 +456,6 @@ export const HistorialView: React.FC<HistorialViewProps> = ({
 }) => {
   const [pestaña, setPestaña] = useState<Pestaña>("audit");
   const [confirmarLimpiar, setConfirmarLimpiar] = useState(false);
-  const [sincronizando, setSincronizando] = useState(false);
   const [avisoSync, setAvisoSync] = useState<{ ok: boolean; texto: string } | null>(null);
 
   const lista =
@@ -463,31 +468,19 @@ export const HistorialView: React.FC<HistorialViewProps> = ({
       : historialPsicosocial;
 
   const tipoActual = TIPO_POR_PESTAÑA[pestaña];
-  const pendientes = lista
-    .filter((e) => e.guardado_en_sheets !== true)
-    .map((e) => ({ id: e.id, fila: filaDeEntrada(tipoActual, e) }))
-    .filter((p): p is { id: string; fila: Record<string, unknown> } => p.fila !== null);
+  const pendientes = pendientesDe(tipoActual, lista);
 
   const handleSincronizar = async () => {
     if (pendientes.length === 0 || sincronizando) return;
-    setSincronizando(true);
     setAvisoSync(null);
-    try {
-      const apiBase = import.meta.env.VITE_API_URL || "";
-      const res = await fetch(`${apiBase}/api/sheets/sync/${tipoActual}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ registros: pendientes.map((p) => p.fila) }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.detail || `Error ${res.status}`);
-      marcarSincronizados(tipoActual, pendientes.map((p) => p.id));
-      setAvisoSync({ ok: true, texto: `${data.guardados} resultado(s) de ${tipoActual} enviados a Google Sheets.` });
-    } catch (err) {
-      setAvisoSync({ ok: false, texto: err instanceof Error ? err.message : "No se pudo enviar a Google Sheets." });
-    } finally {
-      setSincronizando(false);
-    }
+    const { enviados, error } = await sincronizar([tipoActual]);
+    if (error) setAvisoSync({ ok: false, texto: `No se pudo enviar a Google Sheets: ${error}` });
+    else if (enviados > 0)
+      setAvisoSync({ ok: true, texto: `${enviados} resultado(s) de ${tipoActual} enviados a Google Sheets.` });
+  };
+
+  const confirmarEliminar = (nombre: string | undefined, eliminar: () => void) => {
+    if (window.confirm(`¿Eliminar el resultado de ${nombre || "este paciente"} del historial?`)) eliminar();
   };
 
   const handleLimpiar = () => {
@@ -519,7 +512,7 @@ export const HistorialView: React.FC<HistorialViewProps> = ({
           <button
             onClick={handleSincronizar}
             disabled={sincronizando}
-            className="text-xs font-medium px-3 py-1.5 rounded-lg border transition bg-emerald-600 text-white border-emerald-600 hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-wait"
+            className="flex-1 sm:flex-none text-sm sm:text-xs font-medium px-3 py-2.5 sm:py-1.5 rounded-lg border transition bg-emerald-600 text-white border-emerald-600 hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-wait"
           >
             {sincronizando ? "Enviando…" : `Enviar ${pendientes.length} pendiente(s) a Sheets`}
           </button>
@@ -527,7 +520,7 @@ export const HistorialView: React.FC<HistorialViewProps> = ({
         {lista.length > 0 && (
           <button
             onClick={handleLimpiar}
-            className={`text-xs font-medium px-3 py-1.5 rounded-lg border transition ${
+            className={`flex-1 sm:flex-none text-sm sm:text-xs font-medium px-3 py-2.5 sm:py-1.5 rounded-lg border transition ${
               confirmarLimpiar
                 ? "bg-rose-600 text-white border-rose-600 hover:bg-rose-700"
                 : "bg-white text-slate-600 border-slate-300 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-300"
@@ -552,10 +545,10 @@ export const HistorialView: React.FC<HistorialViewProps> = ({
       )}
 
       {/* Sub-pestañas AUDIT / BRIEF / PASS / PSICOSOCIAL */}
-      <div className="flex gap-2 border-b border-slate-200 pb-0 flex-wrap">
+      <div className="-mx-3 px-3 sm:mx-0 sm:px-0 flex gap-1 sm:gap-2 border-b border-slate-200 overflow-x-auto scrollbar-none">
         <button
           onClick={() => { setPestaña("audit"); setConfirmarLimpiar(false); }}
-          className={`px-4 py-2 text-sm font-medium rounded-t-lg border-b-2 transition-all ${
+          className={`shrink-0 whitespace-nowrap px-3 sm:px-4 py-2.5 sm:py-2 text-sm font-medium rounded-t-lg border-b-2 transition-all ${
             pestaña === "audit"
               ? "border-blue-600 text-blue-700 bg-blue-50/60"
               : "border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50"
@@ -570,7 +563,7 @@ export const HistorialView: React.FC<HistorialViewProps> = ({
         </button>
         <button
           onClick={() => { setPestaña("brief"); setConfirmarLimpiar(false); }}
-          className={`px-4 py-2 text-sm font-medium rounded-t-lg border-b-2 transition-all ${
+          className={`shrink-0 whitespace-nowrap px-3 sm:px-4 py-2.5 sm:py-2 text-sm font-medium rounded-t-lg border-b-2 transition-all ${
             pestaña === "brief"
               ? "border-indigo-600 text-indigo-700 bg-indigo-50/60"
               : "border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50"
@@ -585,7 +578,7 @@ export const HistorialView: React.FC<HistorialViewProps> = ({
         </button>
         <button
           onClick={() => { setPestaña("pass"); setConfirmarLimpiar(false); }}
-          className={`px-4 py-2 text-sm font-medium rounded-t-lg border-b-2 transition-all ${
+          className={`shrink-0 whitespace-nowrap px-3 sm:px-4 py-2.5 sm:py-2 text-sm font-medium rounded-t-lg border-b-2 transition-all ${
             pestaña === "pass"
               ? "border-fuchsia-600 text-fuchsia-700 bg-fuchsia-50/60"
               : "border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50"
@@ -600,7 +593,7 @@ export const HistorialView: React.FC<HistorialViewProps> = ({
         </button>
         <button
           onClick={() => { setPestaña("psicosocial"); setConfirmarLimpiar(false); }}
-          className={`px-4 py-2 text-sm font-medium rounded-t-lg border-b-2 transition-all ${
+          className={`shrink-0 whitespace-nowrap px-3 sm:px-4 py-2.5 sm:py-2 text-sm font-medium rounded-t-lg border-b-2 transition-all ${
             pestaña === "psicosocial"
               ? "border-purple-600 text-purple-700 bg-purple-50/60"
               : "border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50"
@@ -641,7 +634,7 @@ export const HistorialView: React.FC<HistorialViewProps> = ({
               <TarjetaAudit
                 key={entry.id}
                 entry={entry}
-                onEliminar={() => eliminarAudit(entry.id)}
+                onEliminar={() => confirmarEliminar(entry.paciente, () => eliminarAudit(entry.id))}
               />
             ))}
           {pestaña === "brief" &&
@@ -649,7 +642,7 @@ export const HistorialView: React.FC<HistorialViewProps> = ({
               <TarjetaBrief
                 key={entry.id}
                 entry={entry}
-                onEliminar={() => eliminarBrief(entry.id)}
+                onEliminar={() => confirmarEliminar(entry.paciente, () => eliminarBrief(entry.id))}
               />
             ))}
           {pestaña === "pass" &&
@@ -657,7 +650,7 @@ export const HistorialView: React.FC<HistorialViewProps> = ({
               <TarjetaPass
                 key={entry.id}
                 entry={entry}
-                onEliminar={() => eliminarPass(entry.id)}
+                onEliminar={() => confirmarEliminar(nombrePaciente(entry.paciente), () => eliminarPass(entry.id))}
               />
             ))}
           {pestaña === "psicosocial" &&
@@ -665,7 +658,7 @@ export const HistorialView: React.FC<HistorialViewProps> = ({
               <TarjetaPsicosocial
                 key={entry.id}
                 entry={entry}
-                onEliminar={() => eliminarPsicosocial(entry.id)}
+                onEliminar={() => confirmarEliminar(entry.sociodemografico?.nombre, () => eliminarPsicosocial(entry.id))}
               />
             ))}
         </div>
