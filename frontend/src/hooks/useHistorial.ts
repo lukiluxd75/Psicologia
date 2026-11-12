@@ -141,6 +141,19 @@ export function useHistorial() {
     setHistorialPsicosocial((prev) => prev.filter((e) => e.id !== id));
   }, []);
 
+  const marcarSincronizados = useCallback(
+    (tipo: "AUDIT" | "BRIEF" | "PASS" | "PSICOSOCIAL", ids: string[]) => {
+      const set = new Set(ids);
+      const marcar = <T extends { id: string; guardado_en_sheets?: boolean }>(prev: T[]) =>
+        prev.map((e) => (set.has(e.id) ? { ...e, guardado_en_sheets: true } : e));
+      if (tipo === "AUDIT") setHistorialAudit(marcar);
+      else if (tipo === "BRIEF") setHistorialBrief(marcar);
+      else if (tipo === "PASS") setHistorialPass(marcar);
+      else setHistorialPsicosocial(marcar);
+    },
+    []
+  );
+
   const limpiarAudit = useCallback(() => setHistorialAudit([]), []);
   const limpiarBrief = useCallback(() => setHistorialBrief([]), []);
   const limpiarPass = useCallback(() => setHistorialPass([]), []);
@@ -162,6 +175,7 @@ export function useHistorial() {
     eliminarBrief,
     eliminarPass,
     eliminarPsicosocial,
+    marcarSincronizados,
     limpiarAudit,
     limpiarBrief,
     limpiarPass,

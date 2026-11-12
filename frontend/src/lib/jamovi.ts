@@ -229,6 +229,23 @@ export function filasDesdeHistorial(tipo: TipoTest, h: HistorialLocal): Fila[] {
   }
 }
 
+/** Fila de una sola entrada del historial (null si le faltan resultados). */
+export function filaDeEntrada(
+  tipo: TipoTest,
+  e: HistorialEntryAudit | HistorialEntryBrief | HistorialEntryPass | HistorialEntryPsicosocial
+): Fila | null {
+  switch (tipo) {
+    case "AUDIT":
+      return filaAudit(e as HistorialEntryAudit);
+    case "BRIEF":
+      return (e as HistorialEntryBrief).resultados?.escalas ? filaBrief(e as HistorialEntryBrief) : null;
+    case "PASS":
+      return (e as HistorialEntryPass).resultados?.subescalas ? filaPass(e as HistorialEntryPass) : null;
+    case "PSICOSOCIAL":
+      return (e as HistorialEntryPsicosocial).resultados ? filaPsicosocial(e as HistorialEntryPsicosocial) : null;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Estadística para gráficos
 // ---------------------------------------------------------------------------

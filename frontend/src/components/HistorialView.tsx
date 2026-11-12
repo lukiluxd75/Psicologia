@@ -21,6 +21,15 @@ import { AuditResultView } from "./AuditResultView";
 import { BriefResultView } from "./BriefResultView";
 import { PassResultView } from "./PassResultView";
 import { PsicosocialResultView } from "./PsicosocialResultView";
+import { filaDeEntrada } from "../lib/jamovi";
+
+type TipoTest = "AUDIT" | "BRIEF" | "PASS" | "PSICOSOCIAL";
+const TIPO_POR_PESTAÑA: Record<"audit" | "brief" | "pass" | "psicosocial", TipoTest> = {
+  audit: "AUDIT",
+  brief: "BRIEF",
+  pass: "PASS",
+  psicosocial: "PSICOSOCIAL",
+};
 
 interface HistorialViewProps {
   historialAudit: HistorialEntryAudit[];
@@ -31,6 +40,7 @@ interface HistorialViewProps {
   eliminarBrief: (id: string) => void;
   eliminarPass: (id: string) => void;
   eliminarPsicosocial: (id: string) => void;
+  marcarSincronizados: (tipo: TipoTest, ids: string[]) => void;
   limpiarAudit: () => void;
   limpiarBrief: () => void;
   limpiarPass: () => void;
@@ -432,6 +442,7 @@ export const HistorialView: React.FC<HistorialViewProps> = ({
   eliminarBrief,
   eliminarPass,
   eliminarPsicosocial,
+  marcarSincronizados,
   limpiarAudit,
   limpiarBrief,
   limpiarPass,
@@ -439,6 +450,8 @@ export const HistorialView: React.FC<HistorialViewProps> = ({
 }) => {
   const [pestaña, setPestaña] = useState<Pestaña>("audit");
   const [confirmarLimpiar, setConfirmarLimpiar] = useState(false);
+  const [sincronizando, setSincronizando] = useState(false);
+  const [avisoSync, setAvisoSync] = useState<{ ok: boolean; texto: string } | null>(null);
 
   const lista =
     pestaña === "audit"
@@ -448,6 +461,34 @@ export const HistorialView: React.FC<HistorialViewProps> = ({
       : pestaña === "pass"
       ? historialPass
       : historialPsicosocial;
+
+  const tipoActual = TIPO_POR_PESTAÑA[pestaña];
+  const pendientes = lista
+    .filter((e) => e.guardado_en_sheets !== true)
+    .map((e) => ({ id: e.id, fila: filaDeEntrada(tipoActual, e) }))
+    .filter((p): p is { id: string; fila: Record<string, unknown> } => p.fila !== null);
+
+  const handleSincronizar = async () => {
+    if (pendientes.length === 0 || sincronizando) return;
+    setSincronizando(true);
+    setAvisoSync(null);
+    try {
+      const apiBase = import.meta.env.VITE_API_URL || "";
+      const res = await fetch(`${apiBase}/api/sheets/sync/${tipoActual}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ registros: pendientes.map((p) => p.fila) }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.detail || `Error ${res.status}`);
+      marcarSincronizados(tipoActual, pendientes.map((p) => p.id));
+      setAvisoSync({ ok: true, texto: `${data.guardados} resultado(s) de ${tipoActual} enviados a Google Sheets.` });
+    } catch (err) {
+      setAvisoSync({ ok: false, texto: err instanceof Error ? err.message : "No se pudo enviar a Google Sheets." });
+    } finally {
+      setSincronizando(false);
+    }
+  };
 
   const handleLimpiar = () => {
     if (!confirmarLimpiar) {
@@ -473,6 +514,16 @@ export const HistorialView: React.FC<HistorialViewProps> = ({
           </h2>
         </div>
 
+        <div className="flex flex-wrap items-center gap-2">
+        {pendientes.length > 0 && (
+          <button
+            onClick={handleSincronizar}
+            disabled={sincronizando}
+            className="text-xs font-medium px-3 py-1.5 rounded-lg border transition bg-emerald-600 text-white border-emerald-600 hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-wait"
+          >
+            {sincronizando ? "Enviando…" : `Enviar ${pendientes.length} pendiente(s) a Sheets`}
+          </button>
+        )}
         {lista.length > 0 && (
           <button
             onClick={handleLimpiar}
@@ -485,7 +536,20 @@ export const HistorialView: React.FC<HistorialViewProps> = ({
             {confirmarLimpiar ? "¿Confirmar borrado?" : "🗑 Limpiar historial"}
           </button>
         )}
+        </div>
       </div>
+
+      {avisoSync && (
+        <p
+          className={`text-xs px-3 py-2 rounded-lg border ${
+            avisoSync.ok
+              ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+              : "bg-rose-50 text-rose-700 border-rose-200"
+          }`}
+        >
+          {avisoSync.texto}
+        </p>
+      )}
 
       {/* Sub-pestañas AUDIT / BRIEF / PASS / PSICOSOCIAL */}
       <div className="flex gap-2 border-b border-slate-200 pb-0 flex-wrap">

@@ -456,6 +456,17 @@ def _respuesta_export(tipo: str, filas: list, incluir_nombres: bool, formato: st
     )
 
 
+@app.post("/api/sheets/sync/{tipo_test}")
+def sincronizar_historial_sheets(tipo_test: str, payload: RegistrosLocales):
+    """Sube a Google Sheets resultados del historial local que no se llegaron a guardar."""
+    tipo = _tipo_valido(tipo_test)
+    try:
+        guardados = sheets_service.guardar_filas_dict(tipo, payload.registros)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"No se pudo guardar en Google Sheets: {e}")
+    return {"guardados": guardados}
+
+
 @app.get("/api/analytics/{tipo_test}")
 def analitica_sheets(tipo_test: str):
     tipo = _tipo_valido(tipo_test)

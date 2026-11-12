@@ -152,6 +152,30 @@ def guardar_resultado_excel(tipo_test: str, datos_fila: list, items=None):
         print(f"Error al guardar en Sheets: {e}")
         return False
 
+def guardar_filas_dict(tipo_test: str, filas: list[dict]) -> int:
+    """
+    Agrega varias filas ya armadas como {cabecera: valor} (p. ej. desde el historial local del navegador).
+    Las columnas se ordenan según las cabeceras de la hoja. Devuelve cuántas filas se guardaron.
+    """
+    if not SPREADSHEET_ID:
+        raise RuntimeError("SPREADSHEET_ID no está configurado.")
+    if not filas:
+        return 0
+    documento = obtener_cliente_sheets().open_by_key(SPREADSHEET_ID)
+    hoja = _obtener_o_crear_hoja(documento, tipo_test)
+    headers = cabeceras_completas(tipo_test)
+
+    def celda(valor):
+        if valor is None:
+            return ""
+        if isinstance(valor, (dict, list)):
+            return json.dumps(valor, ensure_ascii=False)
+        return valor
+
+    hoja.append_rows([[celda(f.get(h)) for h in headers] for f in filas])
+    return len(filas)
+
+
 def obtener_registros_hoja(tipo_test: str) -> list[dict]:
     """
     Devuelve todas las filas de la pestaña indicada como lista de diccionarios

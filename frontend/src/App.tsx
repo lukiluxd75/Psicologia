@@ -29,6 +29,7 @@ export function App() {
     eliminarBrief,
     eliminarPass,
     eliminarPsicosocial,
+    marcarSincronizados,
     limpiarAudit,
     limpiarBrief,
     limpiarPass,
@@ -116,6 +117,7 @@ export function App() {
             eliminarBrief={eliminarBrief}
             eliminarPass={eliminarPass}
             eliminarPsicosocial={eliminarPsicosocial}
+            marcarSincronizados={marcarSincronizados}
             limpiarAudit={limpiarAudit}
             limpiarBrief={limpiarBrief}
             limpiarPass={limpiarPass}
