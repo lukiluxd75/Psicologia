@@ -479,10 +479,9 @@ def sincronizar_historial_sheets(tipo_test: str, payload: RegistrosLocales):
     """Sube a Google Sheets resultados del historial local que no se llegaron a guardar."""
     tipo = _tipo_valido(tipo_test)
     try:
-        guardados = sheets_service.guardar_filas_dict(tipo, payload.registros)
+        return sheets_service.guardar_filas_dict(tipo, payload.registros)
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"No se pudo guardar en Google Sheets: {e}")
-    return {"guardados": guardados}
 
 
 @app.get("/api/analytics/{tipo_test}")

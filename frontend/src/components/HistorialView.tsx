@@ -22,6 +22,7 @@ import { BriefResultView } from "./BriefResultView";
 import { PassResultView } from "./PassResultView";
 import { PsicosocialResultView } from "./PsicosocialResultView";
 import { pendientesDe, type ResultadoSync } from "../hooks/useSheetsSync";
+import { avisarResultadoSync } from "../lib/avisos";
 
 type TipoTest = "AUDIT" | "BRIEF" | "PASS" | "PSICOSOCIAL";
 const TIPO_POR_PESTAÑA: Record<"audit" | "brief" | "pass" | "psicosocial", TipoTest> = {
@@ -473,10 +474,16 @@ export const HistorialView: React.FC<HistorialViewProps> = ({
   const handleSincronizar = async () => {
     if (pendientes.length === 0 || sincronizando) return;
     setAvisoSync(null);
-    const { enviados, error } = await sincronizar([tipoActual]);
-    if (error) setAvisoSync({ ok: false, texto: `No se pudo enviar a Google Sheets: ${error}` });
-    else if (enviados > 0)
-      setAvisoSync({ ok: true, texto: `${enviados} resultado(s) de ${tipoActual} enviados a Google Sheets.` });
+    const r = await sincronizar([tipoActual]);
+    avisarResultadoSync(r);
+    if (r.error) setAvisoSync({ ok: false, texto: `No se pudo enviar a Google Sheets: ${r.error}` });
+    else if (r.enviados || r.omitidos)
+      setAvisoSync({
+        ok: true,
+        texto:
+          `${r.enviados} resultado(s) de ${tipoActual} enviados a Google Sheets` +
+          (r.omitidos ? `; ${r.omitidos} ya estaban en la hoja y no se repitieron.` : "."),
+      });
   };
 
   const confirmarEliminar = (nombre: string | undefined, eliminar: () => void) => {

@@ -1,8 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { filaDeEntrada, type TipoTest } from "../lib/jamovi";
 import { STORAGE_KEYS, type HistorialEntry } from "./useHistorial";
 
-export const INTERVALO_SYNC_MS = 5 * 60 * 1000;
 const TIPOS: TipoTest[] = ["AUDIT", "BRIEF", "PASS", "PSICOSOCIAL"];
 const LOCK_NAME = "psicometric-sheets-sync";
 
@@ -13,7 +12,10 @@ export interface EstadoSync {
 }
 
 export interface ResultadoSync {
+  /** Filas nuevas escritas en la hoja. */
   enviados: number;
+  /** Registros que ya estaban en la hoja y no se repitieron. */
+  omitidos: number;
   error: string | null;
 }
 
@@ -57,22 +59,21 @@ async function conLock<T>(fn: () => Promise<T>): Promise<T | null> {
 
 /**
  * Envía a Google Sheets los resultados del historial local que aún no están guardados allí.
- * Corre al abrir la app, cada 5 minutos, al recuperar conexión y al volver a la app
- * (los celulares congelan los temporizadores cuando la pestaña queda en segundo plano).
+ * Solo se envía cuando el usuario pulsa el botón (cabecera o Historial).
+ * El servidor descarta los registros que ya están en la hoja, así que reenviar no duplica filas.
  */
 export function useSheetsSync(marcarSincronizados: MarcarSincronizados) {
   const [estado, setEstado] = useState<EstadoSync>({ enviando: false, ultimoEnvio: null, error: null });
   const enCurso = useRef(false);
-  const ultimoIntento = useRef(0);
 
   const sincronizar = useCallback(
     async (tipos: TipoTest[] = TIPOS): Promise<ResultadoSync> => {
-      if (enCurso.current) return { enviados: 0, error: null };
+      if (enCurso.current) return { enviados: 0, omitidos: 0, error: null };
       enCurso.current = true;
-      ultimoIntento.current = Date.now();
 
       const apiBase = import.meta.env.VITE_API_URL || "";
       let enviados = 0;
+      let omitidos = 0;
       let error: string | null = null;
 
       try {
@@ -93,7 +94,8 @@ export function useSheetsSync(marcarSincronizados: MarcarSincronizados) {
               const ids = pendientes.map((p) => p.id);
               marcarEnStorage(tipo, new Set(ids));
               marcarSincronizados(tipo, ids);
-              enviados += ids.length;
+              enviados += typeof data.guardados === "number" ? data.guardados : ids.length;
+              omitidos += typeof data.omitidos === "number" ? data.omitidos : 0;
             } catch (err) {
               const msg = err instanceof Error ? err.message : String(err);
               error = msg.includes("Failed to fetch") || msg.includes("NetworkError") ? "Sin conexión con el servidor" : msg;
@@ -108,31 +110,10 @@ export function useSheetsSync(marcarSincronizados: MarcarSincronizados) {
           error,
         }));
       }
-      return { enviados, error };
+      return { enviados, omitidos, error };
     },
     [marcarSincronizados]
   );
-
-  useEffect(() => {
-    const tick = () => {
-      if (navigator.onLine !== false) void sincronizar();
-    };
-    // Al volver a la app: solo si ya pasó el intervalo desde el último intento.
-    const alVolver = () => {
-      if (document.visibilityState === "visible" && Date.now() - ultimoIntento.current >= INTERVALO_SYNC_MS) tick();
-    };
-
-    const inicial = setTimeout(tick, 3000);
-    const intervalo = setInterval(tick, INTERVALO_SYNC_MS);
-    window.addEventListener("online", tick);
-    document.addEventListener("visibilitychange", alVolver);
-    return () => {
-      clearTimeout(inicial);
-      clearInterval(intervalo);
-      window.removeEventListener("online", tick);
-      document.removeEventListener("visibilitychange", alVolver);
-    };
-  }, [sincronizar]);
 
   return { estado, sincronizar };
 }

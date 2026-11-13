@@ -14,7 +14,6 @@ import {
 import { BarPlot, BoxViolinPlot, ChartCard, HistogramPlot } from "./jamovi/JamoviCharts";
 import { parrafoHtml, tablaApaHtml } from "../lib/apa";
 import { TablaApa, TD, TH, type CopiaTabla } from "./jamovi/TablasApa";
-import { AvisosFlotantes } from "./jamovi/Avisos";
 import { avisar, avisarError, copiarConAviso, MSJ_DESCARGA } from "../lib/avisos";
 import {
   interpretarBoxplot,
@@ -367,14 +366,12 @@ export const JamoviAnalyticsView: React.FC<{ historial: HistorialLocal }> = ({ h
           {pestanas}
         </section>
         <CorrelacionView historial={historial} />
-        <AvisosFlotantes />
       </div>
     );
   }
 
   return (
     <div className="space-y-5">
-      <AvisosFlotantes />
       {/* Barra de control */}
       <section className="bg-white border border-slate-200 rounded-xl p-4 space-y-4">
         {encabezado}

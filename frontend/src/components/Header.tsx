@@ -32,14 +32,12 @@ const IndicadorSync: React.FC<{ pendientes: number; estado?: EstadoSync; onClick
   if (estado?.enviando) {
     texto = corto = "Enviando…";
     color = "text-slate-600 bg-slate-50 border-slate-200";
-  } else if (estado?.error && pendientes > 0) {
-    texto = `${pendientes} sin enviar`;
-    corto = `${pendientes}`;
-    color = "text-amber-800 bg-amber-50 border-amber-200";
   } else if (pendientes > 0) {
-    texto = `${pendientes} pendiente${pendientes === 1 ? "" : "s"}`;
-    corto = `${pendientes}`;
-    color = "text-amber-800 bg-amber-50 border-amber-200";
+    texto = `Enviar ${pendientes} a Sheets`;
+    corto = `Enviar ${pendientes}`;
+    color = estado?.error
+      ? "text-white bg-amber-600 border-amber-600"
+      : "text-white bg-emerald-600 border-emerald-600";
   } else {
     texto = estado?.ultimoEnvio ? `Sheets al día · ${horaCorta(estado.ultimoEnvio)}` : "Sheets al día";
     corto = "Sheets";
@@ -47,15 +45,17 @@ const IndicadorSync: React.FC<{ pendientes: number; estado?: EstadoSync; onClick
   }
 
   const titulo = estado?.error
-    ? `Último intento falló: ${estado.error}. Se reintenta cada 5 min. Toca para reintentar ahora.`
-    : "Los resultados se envían a Google Sheets automáticamente cada 5 minutos. Toca para enviar ahora.";
+    ? `Último intento falló: ${estado.error}. Pulsa para reintentar.`
+    : pendientes > 0
+      ? `Hay ${pendientes} resultado(s) guardados solo en este equipo. Pulsa para enviarlos a Google Sheets (los que ya estén allí no se repiten).`
+      : "Todo está en Google Sheets. Los nuevos resultados se envían con este botón.";
 
   return (
     <button
       onClick={onClick}
       disabled={estado?.enviando}
       title={titulo}
-      className={`flex items-center gap-1.5 text-xs px-2.5 py-1.5 sm:py-1 rounded-full border transition hover:brightness-95 disabled:cursor-wait ${color}`}
+      className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border transition hover:brightness-95 disabled:cursor-wait ${color}`}
     >
       {estado?.enviando ? (
         <RefreshCw className="w-3.5 h-3.5 animate-spin" />

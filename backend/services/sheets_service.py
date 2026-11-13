@@ -10,6 +10,7 @@ SCOPES = [
 
 import os
 import json
+import unicodedata
 
 def obtener_cliente_sheets():
     # 1. Intentar desde variable de entorno (ideal para despliegue en la nube)
@@ -159,6 +160,14 @@ def guardar_resultado_excel(tipo_test: str, datos_fila: list, items=None, extras
             fila += [""] * (len(base) + len(ITEMS_POR_TEST.get(tipo_test, [])) - len(fila))
             fila += [extras.get(h, "") for h in CABECERAS_EXTRA.get(tipo_test, [])]
 
+        # Si ese resultado ya está en la hoja (p. ej. se pulsó Guardar dos veces), no se repite.
+        base = CABECERAS_BASE.get(tipo_test, [])
+        nueva = {**dict(zip(base, datos_fila)), **(extras or {})}
+        h = _huella(tipo_test, nueva)
+        if h and any(_es_repetida(h, v) for v in _huellas_existentes(hoja, tipo_test)):
+            print(f"Resultado repetido de {nueva.get('Nombre')} en {tipo_test}: no se vuelve a guardar.")
+            return True
+
         # Inserta la fila al final del documento
         hoja.append_row(fila)
         return True
@@ -166,15 +175,69 @@ def guardar_resultado_excel(tipo_test: str, datos_fila: list, items=None, extras
         print(f"Error al guardar en Sheets: {e}")
         return False
 
-def guardar_filas_dict(tipo_test: str, filas: list[dict]) -> int:
+# ---------------------------------------------------------------------------
+# Detección de duplicados
+# ---------------------------------------------------------------------------
+# Una fila nueva se considera repetida si ya existe otra con el mismo nombre (sin
+# distinguir mayúsculas, tildes ni espacios) y que coincide en todas las columnas de
+# resultados que ambas tienen llenas. Las respuestas ítem por ítem no se comparan:
+# según el camino de guardado pueden venir o no, y el puntaje ya las resume.
+# Una celda vacía en cualquiera de las dos no cuenta como diferencia (p. ej. filas
+# antiguas sin la columna Semestre).
+
+def _normalizar_celda(valor) -> str:
+    if valor is None:
+        return ""
+    texto = str(valor).strip()
+    if not texto:
+        return ""
+    try:
+        return f"{float(texto.replace(',', '.')):g}"
+    except ValueError:
+        pass
+    sin_tildes = "".join(c for c in unicodedata.normalize("NFD", texto) if unicodedata.category(c) != "Mn")
+    return " ".join(sin_tildes.lower().split())
+
+
+def _columnas_comparables(tipo_test: str) -> list[str]:
+    return CABECERAS_BASE.get(tipo_test, []) + CABECERAS_EXTRA.get(tipo_test, [])
+
+
+def _huella(tipo_test: str, fila: dict) -> dict[str, str] | None:
+    """Valores normalizados de las columnas comparables; None si la fila no tiene nombre."""
+    huella = {h: _normalizar_celda(fila.get(h)) for h in _columnas_comparables(tipo_test)}
+    return huella if huella.get("Nombre") else None
+
+
+def _es_repetida(a: dict[str, str], b: dict[str, str]) -> bool:
+    if a["Nombre"] != b["Nombre"]:
+        return False
+    return all(a[h] == b[h] or not a[h] or not b[h] for h in a)
+
+
+def _huellas_existentes(hoja, tipo_test: str) -> list[dict[str, str]]:
+    valores = hoja.get_all_values()
+    if not valores:
+        return []
+    cabeceras = valores[0]
+    huellas = []
+    for fila in valores[1:]:
+        h = _huella(tipo_test, dict(zip(cabeceras, fila)))
+        if h:
+            huellas.append(h)
+    return huellas
+
+
+def guardar_filas_dict(tipo_test: str, filas: list[dict]) -> dict:
     """
     Agrega varias filas ya armadas como {cabecera: valor} (p. ej. desde el historial local del navegador).
-    Las columnas se ordenan según las cabeceras de la hoja. Devuelve cuántas filas se guardaron.
+    Las columnas se ordenan según las cabeceras de la hoja. Omite las filas que ya están en la hoja
+    (o repetidas dentro del mismo envío). Devuelve {"guardados": n, "omitidos": m}.
     """
     if not SPREADSHEET_ID:
         raise RuntimeError("SPREADSHEET_ID no está configurado.")
     if not filas:
-        return 0
+        return {"guardados": 0, "omitidos": 0}
     documento = obtener_cliente_sheets().open_by_key(SPREADSHEET_ID)
     hoja = _obtener_o_crear_hoja(documento, tipo_test)
     headers = cabeceras_completas(tipo_test)
@@ -186,8 +249,19 @@ def guardar_filas_dict(tipo_test: str, filas: list[dict]) -> int:
             return json.dumps(valor, ensure_ascii=False)
         return valor
 
-    hoja.append_rows([[celda(f.get(h)) for h in headers] for f in filas])
-    return len(filas)
+    vistas = _huellas_existentes(hoja, tipo_test)
+    nuevas = []
+    for f in filas:
+        h = _huella(tipo_test, f)
+        if h and any(_es_repetida(h, v) for v in vistas):
+            continue
+        if h:
+            vistas.append(h)
+        nuevas.append([celda(f.get(c)) for c in headers])
+
+    if nuevas:
+        hoja.append_rows(nuevas)
+    return {"guardados": len(nuevas), "omitidos": len(filas) - len(nuevas)}
 
 
 def obtener_registros_hoja(tipo_test: str) -> list[dict]:

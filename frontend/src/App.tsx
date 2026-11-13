@@ -9,6 +9,8 @@ import { HistorialView } from "./components/HistorialView";
 import { JamoviAnalyticsView } from "./components/JamoviAnalyticsView";
 import { useHistorial } from "./hooks/useHistorial";
 import { pendientesDe, useSheetsSync } from "./hooks/useSheetsSync";
+import { avisarResultadoSync } from "./lib/avisos";
+import { AvisosFlotantes } from "./components/jamovi/Avisos";
 
 export function App() {
   const [tabActiva, setTabActiva] = useState<string>("ocr");
@@ -97,6 +99,7 @@ export function App() {
 
   return (
     <div className="min-h-screen bg-slate-50/70 text-slate-800 flex flex-col font-sans">
+      <AvisosFlotantes />
       {/* Barra de navegación superior con estado del backend */}
       <Header
         tabActiva={tabActiva}
@@ -110,7 +113,7 @@ export function App() {
         totalHistorial={totalHistorial}
         pendientesSheets={pendientesSheets}
         estadoSync={estadoSync}
-        onSincronizar={() => void sincronizar()}
+        onSincronizar={async () => avisarResultadoSync(await sincronizar())}
       />
 
       {/* Contenido Principal */}

@@ -38,3 +38,19 @@ export async function copiarConAviso(html: string, texto: string, titulo: string
     return false;
   }
 }
+
+/** Aviso tras pulsar "Enviar a Sheets". */
+export function avisarResultadoSync(r: { enviados: number; omitidos: number; error: string | null }) {
+  if (r.error) {
+    avisarError("No se pudo enviar a Google Sheets", `${r.error}. Los resultados siguen guardados en este equipo: vuelve a pulsar Enviar.`);
+    return;
+  }
+  if (r.enviados === 0 && r.omitidos === 0) {
+    avisar("No hay nada pendiente", "Todos los resultados de este equipo ya están en Google Sheets.");
+    return;
+  }
+  const partes = [];
+  if (r.enviados) partes.push(`${r.enviados} resultado(s) nuevo(s) guardado(s)`);
+  if (r.omitidos) partes.push(`${r.omitidos} ya estaba(n) en la hoja y no se repitió/repitieron`);
+  avisar("Enviado a Google Sheets", `${partes.join("; ")}.`);
+}
