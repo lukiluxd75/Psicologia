@@ -13,6 +13,7 @@ import {
   ticksBonitos,
   type Descriptiva,
   type FilaFrecuencia,
+  type Fiabilidad,
 } from "../../lib/jamovi";
 import { avisar, avisarError, MSJ_DESCARGA } from "../../lib/avisos";
 import { Interpretacion } from "./TablasApa";
@@ -452,6 +453,95 @@ export const HistogramPlot: React.FC<{
           {variable.etiqueta}
         </text>
       </g>
+    </svg>
+  );
+};
+
+/* ─── D. α de Cronbach por escala ─────────────────────────────────────── */
+
+const ALFA_ACEPTABLE = 0.7;
+const fmtAlfa = (v: number) => v.toFixed(2).replace(/^(-?)0\./, "$1.");
+
+export const FiabilidadPlot: React.FC<{ filas: Fiabilidad[]; titulo: string }> = ({ filas, titulo }) => {
+  if (filas.length === 0) return <SinDatos />;
+  const m = { t: 58, r: 150, b: 52, l: 200 };
+  const fila = 34;
+  const W = 720;
+  const H = m.t + m.b + fila * filas.length;
+  const calculados = filas.flatMap((f) => (f.alfa === null ? [] : [f.alfa]));
+  // El α puede ser negativo si los ítems se contradicen; en ese caso el eje arranca por debajo de 0.
+  const minimo = Math.min(0, Math.floor(Math.min(...calculados, 0) * 10) / 10);
+  const x = (v: number) => m.l + ((v - minimo) / (1 - minimo)) * (W - m.l - m.r);
+  const ticks = Array.from({ length: Math.round((1 - minimo) * 10) + 1 }, (_, i) => Math.round((minimo + i / 10) * 10) / 10);
+  const barH = 16;
+  const indiceTotal = filas.findIndex((f) => f.escala === "total");
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ minWidth: 600, maxWidth: W, display: "block", margin: "0 auto" }} role="img" aria-label={titulo}>
+      <rect width={W} height={H} fill="#ffffff" />
+      <text x={W / 2} y={22} textAnchor="middle" fontFamily={FUENTE} fontSize={14} fontWeight={600} fill={JMV.tinta}>
+        {titulo}
+      </text>
+
+      <g fontFamily={FUENTE} fontSize={11} fill={JMV.tintaSuave}>
+        {ticks.map((t) => (
+          <g key={t}>
+            <line x1={x(t)} x2={x(t)} y1={m.t} y2={H - m.b} stroke={JMV.grid} />
+            <text x={x(t)} y={H - m.b + 17} textAnchor="middle">
+              {t === 0 ? "0" : fmtAlfa(t)}
+            </text>
+          </g>
+        ))}
+        <text x={(m.l + W - m.r) / 2} y={H - 12} textAnchor="middle" fontSize={12} fill={JMV.tinta}>
+          α de Cronbach
+        </text>
+      </g>
+
+      <line x1={x(ALFA_ACEPTABLE)} x2={x(ALFA_ACEPTABLE)} y1={m.t - 8} y2={H - m.b} stroke={JMV.coral} strokeWidth={1.6} strokeDasharray="5 4" />
+      <text x={x(ALFA_ACEPTABLE) + 4} y={m.t - 12} fontFamily={FUENTE} fontSize={10.5} fill={JMV.tinta}>
+        α = .70 (mínimo aceptable)
+      </text>
+
+      {filas.map((f, i) => {
+        const cy = m.t + fila * (i + 0.5);
+        const esTotal = i === indiceTotal;
+        const lineas = partirEtiqueta(f.etiqueta, 28);
+        return (
+          <g key={f.escala} fontFamily={FUENTE}>
+            {esTotal && i > 0 && <line x1={8} x2={W - 8} y1={cy - fila / 2} y2={cy - fila / 2} stroke={JMV.eje} strokeWidth={0.8} />}
+            <text x={m.l - 10} y={cy - (lineas.length - 1) * 6.5} textAnchor="end" dominantBaseline="middle" fontSize={11.5} fontWeight={esTotal ? 700 : 400} fill={JMV.tinta}>
+              {lineas.map((l, k) => (
+                <tspan key={k} x={m.l - 10} dy={k === 0 ? 0 : 13}>
+                  {l}
+                </tspan>
+              ))}
+            </text>
+            {f.alfa === null ? (
+              <text x={x(0) + 6} y={cy} dominantBaseline="middle" fontSize={11} fontStyle="italic" fill={JMV.tintaSuave}>
+                Sin casos completos suficientes
+              </text>
+            ) : (
+              <>
+                <rect
+                  x={Math.min(x(0), x(f.alfa))}
+                  y={cy - barH / 2}
+                  width={Math.max(2, Math.abs(x(f.alfa) - x(0)))}
+                  height={barH}
+                  rx={3}
+                  fill={f.alfa >= ALFA_ACEPTABLE ? JMV.azul : JMV.ambar}
+                >
+                  <title>{`${f.etiqueta}: α = ${fmtAlfa(f.alfa)} (${f.interpretacion}) · k = ${f.k} ítems · n = ${f.n}`}</title>
+                </rect>
+                <text x={x(Math.max(f.alfa, 0)) + 6} y={cy} dominantBaseline="middle" fontSize={11.5} fill={JMV.tinta} stroke="#ffffff" strokeWidth={4} strokeLinejoin="round" paintOrder="stroke">
+                  <tspan fontWeight={600}>{fmtAlfa(f.alfa)}</tspan>
+                  <tspan fill={JMV.tintaSuave}>{` · ${f.interpretacion}`}</tspan>
+                </text>
+              </>
+            )}
+          </g>
+        );
+      })}
+      <line x1={x(0)} x2={x(0)} y1={m.t} y2={H - m.b} stroke={JMV.eje} />
     </svg>
   );
 };

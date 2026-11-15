@@ -146,6 +146,26 @@ export function interpretarFiabilidad(filas: Fiabilidad[]): string {
   return frases.join(" ");
 }
 
+/** Lectura del gráfico de barras del α: cuántas escalas superan .70 y cuáles son los extremos. */
+export function interpretarGraficoFiabilidad(filas: Fiabilidad[]): string {
+  const escalas = filas.filter((f) => f.escala !== "total" && f.alfa !== null);
+  if (!escalas.length) return "";
+  const orden = [...escalas].sort((a, b) => b.alfa! - a.alfa!);
+  const aceptables = escalas.filter((f) => f.alfa! >= 0.7).length;
+  const frases = [
+    `${aceptables} de ${escalas.length} escalas alcanzan el mínimo aceptable (α ≥ .70).`,
+  ];
+  if (orden.length > 1)
+    frases.push(
+      `La más consistente es ${orden[0].etiqueta} (α = ${alfa(orden[0].alfa)}) y la menos consistente, ${orden[orden.length - 1].etiqueta} (α = ${alfa(orden[orden.length - 1].alfa)}).`
+    );
+  const total = filas.find((f) => f.escala === "total" && f.alfa !== null);
+  if (total) frases.push(`La escala total obtiene α = ${alfa(total.alfa)} (${total.interpretacion.toLowerCase()}).`);
+  if (escalas.some((f) => f.alfa! < 0))
+    frases.push("Un α negativo indica que los ítems de esa escala no se relacionan entre sí en esta muestra; conviene revisar la lectura de las hojas.");
+  return frases.join(" ");
+}
+
 /** Magnitud de la d de Cohen (1988). */
 export function magnitudD(d: number | null | undefined): string {
   if (d === null || d === undefined) return "";

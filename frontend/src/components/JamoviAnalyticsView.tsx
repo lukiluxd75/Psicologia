@@ -11,7 +11,7 @@ import {
   type HistorialLocal,
   type TipoTest,
 } from "../lib/jamovi";
-import { BarPlot, BoxViolinPlot, ChartCard, HistogramPlot } from "./jamovi/JamoviCharts";
+import { BarPlot, BoxViolinPlot, ChartCard, FiabilidadPlot, HistogramPlot } from "./jamovi/JamoviCharts";
 import { parrafoHtml, tablaApaHtml } from "../lib/apa";
 import { TablaApa, TD, TH, type CopiaTabla } from "./jamovi/TablasApa";
 import { avisar, avisarError, copiarConAviso, MSJ_DESCARGA } from "../lib/avisos";
@@ -19,6 +19,7 @@ import {
   interpretarBoxplot,
   interpretarDescriptivas,
   interpretarFiabilidad,
+  interpretarGraficoFiabilidad,
   interpretarFrecuencias,
   interpretarHistograma,
 } from "../lib/interpretacion";
@@ -526,6 +527,17 @@ export const JamoviAnalyticsView: React.FC<{ historial: HistorialLocal }> = ({ h
               </p>
             )}
           </section>
+
+          {hayFiabilidad && (
+            <ChartCard
+              titulo="Gráfico de fiabilidad por escala"
+              subtitulo="α de Cronbach de cada escala · línea discontinua = mínimo aceptable (.70) · barras ámbar = por debajo de .70"
+              archivo={`${prefijo}_fiabilidad.png`}
+              interpretacion={interpretarGraficoFiabilidad(datos.fiabilidad)}
+            >
+              <FiabilidadPlot filas={datos.fiabilidad} titulo={`${MODULOS.find((m) => m.id === tipo)!.nombre}: consistencia interna por escala`} />
+            </ChartCard>
+          )}
 
           {tablasFrecuencia.length > 0 && (
             <section className="bg-white border border-slate-200 rounded-xl p-4 sm:p-5 grid grid-cols-1 gap-6 md:grid-cols-2">
