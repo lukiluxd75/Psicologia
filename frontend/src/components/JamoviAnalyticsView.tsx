@@ -23,6 +23,7 @@ import {
   interpretarHistograma,
 } from "../lib/interpretacion";
 import { CorrelacionView } from "./CorrelacionView";
+import { CitaJamovi } from "./jamovi/CitaJamovi";
 
 type Fuente = "sheets" | "local" | "combinado";
 
@@ -366,6 +367,7 @@ export const JamoviAnalyticsView: React.FC<{ historial: HistorialLocal }> = ({ h
           {pestanas}
         </section>
         <CorrelacionView historial={historial} />
+        <CitaJamovi />
       </div>
     );
   }
@@ -558,6 +560,8 @@ export const JamoviAnalyticsView: React.FC<{ historial: HistorialLocal }> = ({ h
           </li>
         </ol>
       </details>
+
+      <CitaJamovi />
     </div>
   );
 };
