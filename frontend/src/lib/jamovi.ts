@@ -36,6 +36,8 @@ export interface Fiabilidad {
   escala: string;
   etiqueta: string;
   k: number;
+  /** Columnas del dataset exportado (item_01, …) que forman la escala. */
+  items?: string[];
   n: number;
   alfa: number | null;
   interpretacion: string;
@@ -340,6 +342,89 @@ export const portapapelesDisponible = () =>
 export async function copiarSvgAlPortapapeles(svg: SVGSVGElement, escala = 2): Promise<void> {
   if (!portapapelesDisponible()) throw new Error("Portapapeles no disponible");
   await navigator.clipboard.write([new ClipboardItem({ "image/png": svgAPng(svg, escala) })]);
+}
+
+export interface LeyendaApa {
+  numero: number;
+  titulo: string;
+  nota?: string;
+}
+
+function partirLineas(texto: string, max: number): string[] {
+  const lineas: string[] = [];
+  let actual = "";
+  for (const palabra of texto.split(/\s+/)) {
+    if (actual && (actual + " " + palabra).length > max) {
+      lineas.push(actual);
+      actual = palabra;
+    } else actual = actual ? `${actual} ${palabra}` : palabra;
+  }
+  if (actual) lineas.push(actual);
+  return lineas;
+}
+
+/**
+ * Devuelve un <svg> nuevo con el gráfico dentro y la leyenda APA 7 alrededor:
+ * "Figura N" en negrita y el título en cursiva arriba, "Nota." debajo. Así la imagen
+ * copiada o descargada ya va lista para pegar en Word.
+ */
+export function svgConLeyendaApa(svg: SVGSVGElement, { numero, titulo, nota }: LeyendaApa): SVGSVGElement {
+  const NS = "http://www.w3.org/2000/svg";
+  const { width, height } = svg.viewBox.baseVal;
+  const margen = 16;
+  const fuente = "'Times New Roman', Times, serif";
+  const maxCar = Math.floor((width - 2 * margen) / 7);
+  const lineasTitulo = partirLineas(titulo, maxCar);
+  const lineasNota = nota ? partirLineas(`Nota. ${nota}`, Math.floor((width - 2 * margen) / 6.2)) : [];
+  const altoCabecera = 20 + 20 + 19 * lineasTitulo.length + 4;
+  const altoNota = lineasNota.length ? 10 + 16 * lineasNota.length + 8 : 0;
+  const total = altoCabecera + height + altoNota;
+
+  const raiz = document.createElementNS(NS, "svg");
+  raiz.setAttribute("xmlns", NS);
+  raiz.setAttribute("viewBox", `0 0 ${width} ${total}`);
+  const fondo = document.createElementNS(NS, "rect");
+  fondo.setAttribute("width", String(width));
+  fondo.setAttribute("height", String(total));
+  fondo.setAttribute("fill", "#ffffff");
+  raiz.appendChild(fondo);
+
+  const texto = (contenido: string, y: number, tam: number, extra: Record<string, string> = {}) => {
+    const t = document.createElementNS(NS, "text");
+    t.setAttribute("x", String(margen));
+    t.setAttribute("y", String(y));
+    t.setAttribute("font-family", fuente);
+    t.setAttribute("font-size", String(tam));
+    t.setAttribute("fill", "#000000");
+    Object.entries(extra).forEach(([k, v]) => t.setAttribute(k, v));
+    t.textContent = contenido;
+    raiz.appendChild(t);
+    return t;
+  };
+
+  texto(`Figura ${numero}`, 26, 16, { "font-weight": "bold" });
+  lineasTitulo.forEach((l, i) => texto(l, 50 + 19 * i, 16, { "font-style": "italic" }));
+
+  const grafico = svg.cloneNode(true) as SVGSVGElement;
+  grafico.removeAttribute("style");
+  grafico.setAttribute("x", "0");
+  grafico.setAttribute("y", String(altoCabecera));
+  grafico.setAttribute("width", String(width));
+  grafico.setAttribute("height", String(height));
+  raiz.appendChild(grafico);
+
+  lineasNota.forEach((l, i) => {
+    const t = texto("", altoCabecera + height + 22 + 16 * i, 13);
+    if (i === 0) {
+      const etiqueta = document.createElementNS(NS, "tspan");
+      etiqueta.setAttribute("font-style", "italic");
+      etiqueta.textContent = "Nota.";
+      t.appendChild(etiqueta);
+      t.appendChild(document.createTextNode(l.slice("Nota.".length)));
+    } else t.textContent = l;
+  });
+
+  return raiz;
 }
 
 /** Rasteriza un <svg> a PNG a escala 2x con fondo blanco. Los estilos deben ir como atributos. */

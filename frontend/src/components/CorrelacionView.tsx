@@ -728,8 +728,9 @@ export const CorrelacionView: React.FC<{ historial: HistorialLocal }> = ({ histo
           </section>
 
           <ChartCard
-            titulo="Diagrama de dispersión AUDIT × BRIEF"
-            subtitulo="Un punto por estudiante · línea continua = recta de regresión de cada semestre · discontinua = muestra total"
+            numero={1}
+            titulo="Relación entre el puntaje AUDIT y el puntaje BRIEF por semestre"
+            subtitulo="Cada punto es un estudiante. Las líneas continuas son la recta de regresión de cada semestre y la discontinua, la de la muestra total."
             archivo="correlacion_audit_brief_dispersion.png"
             interpretacion={interpretarDispersion(datos)}
           >
@@ -737,8 +738,9 @@ export const CorrelacionView: React.FC<{ historial: HistorialLocal }> = ({ histo
           </ChartCard>
 
           <ChartCard
-            titulo="Promedios por semestre"
-            subtitulo="Barras = media · líneas = ± 1 desviación estándar"
+            numero={2}
+            titulo="Puntajes medios de AUDIT y BRIEF por semestre"
+            subtitulo="Las barras muestran la media y las líneas, ± 1 desviación estándar."
             archivo="correlacion_audit_brief_promedios.png"
             interpretacion={frasesDiferencia(datos).join(" ")}
           >

@@ -148,6 +148,52 @@ const copiaFiabilidad = (filas: Fiabilidad[]): CopiaTabla => ({
   filas: filas.map((f) => [f.etiqueta, String(f.k), String(f.n), fmtAlfa(f.alfa), f.interpretacion]),
 });
 
+/** Pasos para obtener en Jamovi el mismo α de cada escala a partir del .sav exportado. */
+const FiabilidadEnJamovi: React.FC<{ filas: Fiabilidad[] }> = ({ filas }) => {
+  const conItems = filas.filter((f) => f.items?.length);
+  if (!conItems.length) return null;
+  return (
+    <details className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-700">
+      <summary className="cursor-pointer font-semibold text-slate-900">Cómo obtener esta tabla en Jamovi</summary>
+      <ol className="list-decimal pl-5 mt-3 space-y-2">
+        <li>
+          Pulsa <b>Descargar para Jamovi (.sav)</b> y abre el archivo en Jamovi.
+        </li>
+        <li>
+          Ve a <b>Factor → Análisis de fiabilidad</b> (<i>Reliability Analysis</i>) y deja marcado <b>α de Cronbach</b>.
+        </li>
+        <li>
+          Haz un análisis por escala: arrastra a <i>Items</i> exactamente estas columnas. Jamovi excluye los casos con algún ítem vacío, igual
+          que esta tabla, así que el α debe coincidir.
+        </li>
+      </ol>
+      <div className="mt-3 overflow-x-auto">
+        <table className="w-full text-xs border-collapse">
+          <thead>
+            <tr className="border-b border-slate-300">
+              <th className="text-left font-semibold text-slate-900 py-1 pr-3">Escala</th>
+              <th className="text-left font-semibold text-slate-900 py-1">Ítems</th>
+            </tr>
+          </thead>
+          <tbody>
+            {conItems.map((f) => (
+              <tr key={f.escala} className="border-b border-slate-100 align-top">
+                <td className="py-1.5 pr-3 whitespace-nowrap text-slate-800">{f.etiqueta}</td>
+                <td className="py-1.5 font-mono text-slate-700">
+                  {f.escala === "total" ? `Los ${f.k} ítems de las escalas anteriores` : f.items!.join(", ")}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="mt-2 text-xs text-slate-500">
+        Jamovi no dibuja el α de todas las escalas en un solo gráfico: para el informe usa la figura de esta página (botón Copiar figura).
+      </p>
+    </details>
+  );
+};
+
 const TablaFiabilidad: React.FC<{ filas: Fiabilidad[]; numero: number }> = ({ filas, numero }) => (
   <TablaApa
     numero={numero}
@@ -275,6 +321,11 @@ export const JamoviAnalyticsView: React.FC<{ historial: HistorialLocal }> = ({ h
   const barraActiva = datos && datos.frecuencias[varBarra]?.tabla.length ? varBarra : (datos?.categorica_principal ?? "");
   const tablaBarra = datos?.frecuencias[barraActiva];
   const prefijo = `jamovi_${tipo.toLowerCase()}`;
+  // Figuras numeradas en el orden en que aparecen (APA 7)
+  const figBox = 1;
+  const figBarra = tablaBarra ? figBox + 1 : figBox;
+  const figHistograma = global ? figBarra + 1 : figBarra;
+  const figFiabilidad = figHistograma + 1;
   const interpDescriptivas = datos ? interpretarDescriptivas(datos.descriptivas, datos.total_registros, global) : "";
 
   const copiarTablas = async () => {
@@ -473,8 +524,9 @@ export const JamoviAnalyticsView: React.FC<{ historial: HistorialLocal }> = ({ h
           </section>
 
           <ChartCard
+            numero={figBox}
             titulo="Diagrama de cajas con violín y casos individuales"
-            subtitulo="Caja = Q1–Q3 · línea = mediana · ■ = media · bigotes = 1.5 × RIC · puntos con jitter"
+            subtitulo="La caja abarca de Q1 a Q3; la línea interior es la mediana y el cuadrado, la media. Los bigotes llegan hasta 1.5 × RIC y cada punto es un caso (con desplazamiento horizontal aleatorio para que no se superpongan)."
             archivo={`${prefijo}_boxplot.png`}
             interpretacion={interpretarBoxplot(escalasBox)}
           >
@@ -483,8 +535,9 @@ export const JamoviAnalyticsView: React.FC<{ historial: HistorialLocal }> = ({ h
 
           {tablaBarra && (
             <ChartCard
-              titulo="Gráfico de barras de frecuencias"
-              subtitulo="n (% del total) sobre cada barra"
+              numero={figBarra}
+              titulo={`Frecuencias de ${tablaBarra.etiqueta}`}
+              subtitulo="Sobre cada barra se indica la frecuencia absoluta (n) y, entre paréntesis, el porcentaje del total."
               archivo={`${prefijo}_barras_${barraActiva}.png`}
               interpretacion={interpretarFrecuencias(tablaBarra.etiqueta, tablaBarra.tabla)}
               acciones={
@@ -508,8 +561,9 @@ export const JamoviAnalyticsView: React.FC<{ historial: HistorialLocal }> = ({ h
 
           {global && (
             <ChartCard
-              titulo="Histograma con curva de densidad"
-              subtitulo={datos.cortes.length ? "Líneas discontinuas = puntos de corte clínicos" : undefined}
+              numero={figHistograma}
+              titulo={`Distribución de ${global.etiqueta}`}
+              subtitulo={`Histograma con curva de densidad.${datos.cortes.length ? " Las líneas discontinuas marcan los puntos de corte clínicos." : ""}`}
               archivo={`${prefijo}_histograma.png`}
               interpretacion={interpretarHistograma(global, datos.cortes, datos.filas_crudas)}
             >
@@ -519,7 +573,10 @@ export const JamoviAnalyticsView: React.FC<{ historial: HistorialLocal }> = ({ h
 
           <section className="bg-white border border-slate-200 rounded-xl p-4 sm:p-5">
             {hayFiabilidad ? (
-              <TablaFiabilidad filas={datos.fiabilidad} numero={2} />
+              <div className="space-y-3">
+                <TablaFiabilidad filas={datos.fiabilidad} numero={2} />
+                <FiabilidadEnJamovi filas={datos.fiabilidad} />
+              </div>
             ) : (
               <p className="text-sm text-slate-600">
                 <span className="font-semibold text-slate-900">Fiabilidad (α de Cronbach):</span> los registros actuales no tienen las
@@ -530,8 +587,9 @@ export const JamoviAnalyticsView: React.FC<{ historial: HistorialLocal }> = ({ h
 
           {hayFiabilidad && (
             <ChartCard
-              titulo="Gráfico de fiabilidad por escala"
-              subtitulo="α de Cronbach de cada escala · línea discontinua = mínimo aceptable (.70) · barras ámbar = por debajo de .70"
+              numero={figFiabilidad}
+              titulo="Fiabilidad por consistencia interna de cada escala"
+              subtitulo="α = alfa de Cronbach. La línea discontinua marca el mínimo aceptable (α = .70); las barras en ámbar quedan por debajo. Interpretación según George y Mallery (2003)."
               archivo={`${prefijo}_fiabilidad.png`}
               interpretacion={interpretarGraficoFiabilidad(datos.fiabilidad)}
             >

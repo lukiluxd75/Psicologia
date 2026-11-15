@@ -373,6 +373,7 @@ def calcular_fiabilidad(tipo_test: str, registros: list[dict]) -> list[dict]:
             "escala": clave,
             "etiqueta": etiqueta,
             "k": len(items),
+            "items": columnas,
             "n": len(matriz),
             "alfa": None if alfa is None else round(alfa, 3),
             "interpretacion": interpretar_alfa(alfa),

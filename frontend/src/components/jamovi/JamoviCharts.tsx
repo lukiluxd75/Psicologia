@@ -8,6 +8,7 @@ import {
   descargarSvgComoPng,
   portapapelesDisponible,
   svgAPng,
+  svgConLeyendaApa,
   fmt,
   jitter,
   ticksBonitos,
@@ -22,14 +23,20 @@ export const FUENTE = "Arial, Helvetica, sans-serif";
 
 /* ─── Contenedor con botón de descarga PNG ─────────────────────────────── */
 
+/**
+ * Con `numero` el gráfico se presenta como figura APA 7: "Figura N", título en cursiva
+ * y el `subtitulo` pasa a ser la nota de la figura. La imagen copiada o descargada
+ * incluye esa leyenda.
+ */
 export const ChartCard: React.FC<{
   titulo: string;
   subtitulo?: string;
+  numero?: number;
   archivo: string;
   acciones?: React.ReactNode;
   interpretacion?: string;
   children: React.ReactNode;
-}> = ({ titulo, subtitulo, archivo, acciones, interpretacion, children }) => {
+}> = ({ titulo, subtitulo, numero, archivo, acciones, interpretacion, children }) => {
   const ref = useRef<HTMLDivElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [copiado, setCopiado] = useState(false);
@@ -39,7 +46,11 @@ export const ChartCard: React.FC<{
     if (imagenManual) URL.revokeObjectURL(imagenManual);
   }, [imagenManual]);
 
-  const svgActual = () => ref.current?.querySelector("svg") ?? null;
+  const svgActual = () => {
+    const svg = ref.current?.querySelector("svg") ?? null;
+    if (!svg || numero === undefined) return svg;
+    return svgConLeyendaApa(svg, { numero, titulo, nota: subtitulo });
+  };
 
   // Si el navegador no deja escribir en el portapapeles (p. ej. la app abierta por http
   // desde otra máquina), se muestra el PNG para copiarlo con clic derecho / pulsación larga.
@@ -65,7 +76,9 @@ export const ChartCard: React.FC<{
       await copiarSvgAlPortapapeles(svg);
       setCopiado(true);
       setTimeout(() => setCopiado(false), 2000);
-      avisar("Gráfico copiado", "Pégalo con Ctrl+V en Word, PowerPoint o WhatsApp.");
+      if (numero !== undefined)
+        avisar(`Figura ${numero} copiada`, "Pégala en Word con Ctrl+V: la imagen incluye el número, el título y la nota en formato APA.");
+      else avisar("Gráfico copiado", "Pégalo con Ctrl+V en Word, PowerPoint o WhatsApp.");
     } catch {
       try {
         await mostrarImagenManual(svg);
@@ -92,10 +105,18 @@ export const ChartCard: React.FC<{
   return (
     <section className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
       <div className="flex flex-wrap items-start justify-between gap-2">
-        <div>
-          <h3 className="text-sm font-semibold text-slate-900">{titulo}</h3>
-          {subtitulo && <p className="text-xs text-slate-500 mt-0.5">{subtitulo}</p>}
-        </div>
+        {numero !== undefined ? (
+          <h3 className="text-sm">
+            <span className="font-bold text-slate-900">Figura {numero}</span>
+            <br />
+            <span className="italic font-normal text-slate-800">{titulo}</span>
+          </h3>
+        ) : (
+          <div>
+            <h3 className="text-sm font-semibold text-slate-900">{titulo}</h3>
+            {subtitulo && <p className="text-xs text-slate-500 mt-0.5">{subtitulo}</p>}
+          </div>
+        )}
         <div className="flex flex-wrap items-center gap-2">
           {acciones}
           <button
@@ -108,7 +129,7 @@ export const ChartCard: React.FC<{
               </>
             ) : (
               <>
-                <ClipboardCopy className="w-3.5 h-3.5" /> Copiar imagen
+                <ClipboardCopy className="w-3.5 h-3.5" /> {numero !== undefined ? "Copiar figura" : "Copiar imagen"}
               </>
             )}
           </button>
@@ -123,6 +144,11 @@ export const ChartCard: React.FC<{
       <div ref={ref} className="overflow-x-auto">
         {children}
       </div>
+      {numero !== undefined && subtitulo && (
+        <p className="text-xs text-slate-600">
+          <span className="italic">Nota.</span> {subtitulo}
+        </p>
+      )}
       {imagenManual && (
         <div className="border border-slate-200 rounded-lg p-3 space-y-2 bg-slate-50">
           <div className="flex items-start justify-between gap-2">
