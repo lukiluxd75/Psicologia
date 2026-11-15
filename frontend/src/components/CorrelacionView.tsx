@@ -96,7 +96,6 @@ interface Resultado {
 type Fuente = "sheets" | "local";
 
 const apiBase = import.meta.env.VITE_API_URL || "";
-const SEMESTRES = Array.from({ length: 10 }, (_, i) => i + 1);
 const PALETA = [JMV.azul, JMV.ambar, JMV.verde, JMV.coral];
 
 /* ─── Formato APA ─────────────────────────────────────────────────────── */
@@ -453,8 +452,9 @@ const NOTA_CORR =
 
 export const CorrelacionView: React.FC<{ historial: HistorialLocal }> = ({ historial }) => {
   const [fuente, setFuente] = useState<Fuente>("sheets");
-  const [semA, setSemA] = useState(1);
-  const [semB, setSemB] = useState(8);
+  // El estudio solo registra 1.º y 8.º semestre.
+  const semA = 1;
+  const semB = 8;
   const [recarga, setRecarga] = useState(0);
   const [incluirNombres, setIncluirNombres] = useState(false);
   const [copiado, setCopiado] = useState(false);
@@ -656,24 +656,7 @@ export const CorrelacionView: React.FC<{ historial: HistorialLocal }> = ({ histo
               <option value="local">Solo historial de este equipo</option>
             </select>
           </label>
-          <label className="flex items-center gap-2 text-sm text-slate-700">
-            Comparar
-            <select value={semA} onChange={(e) => setSemA(Number(e.target.value))} className={selectCls} aria-label="Primer semestre">
-              {SEMESTRES.map((s) => (
-                <option key={s} value={s}>
-                  {s}.º
-                </option>
-              ))}
-            </select>
-            con
-            <select value={semB} onChange={(e) => setSemB(Number(e.target.value))} className={selectCls} aria-label="Segundo semestre">
-              {SEMESTRES.map((s) => (
-                <option key={s} value={s}>
-                  {s}.º
-                </option>
-              ))}
-            </select>
-          </label>
+          <p className="text-sm text-slate-700">Compara 1.º con 8.º semestre</p>
           <button
             onClick={() => setRecarga((r) => r + 1)}
             disabled={cargando}

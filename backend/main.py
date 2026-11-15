@@ -76,10 +76,13 @@ def health_check():
     }
 
 
+SEMESTRES_PERMITIDOS = (1, 8)
+
+
 def _semestre(valor) -> str:
-    """Semestre tal como se guarda en Sheets ("8"), o "" si no se indicó o no es válido."""
+    """Semestre tal como se guarda en Sheets ("1" u "8"), o "" si no se indicó o no es 1.º ni 8.º."""
     n = correlacion_service.parsear_semestre(valor)
-    return str(n) if n else ""
+    return str(n) if n in SEMESTRES_PERMITIDOS else ""
 
 
 @app.post("/api/upload/audit")

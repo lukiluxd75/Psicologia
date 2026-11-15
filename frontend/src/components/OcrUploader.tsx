@@ -11,11 +11,16 @@ const ETIQUETA_TEST: Record<TipoTest, string> = {
 };
 
 const CLAVE_SEMESTRE = "ocr_semestre";
-const SEMESTRES = Array.from({ length: 10 }, (_, i) => String(i + 1));
+// El estudio compara solo estos dos semestres.
+const SEMESTRES = [
+  { valor: "1", texto: "1.º semestre (primero)" },
+  { valor: "8", texto: "8.º semestre (octavo)" },
+];
 
 function leerSemestre(): string {
   try {
-    return localStorage.getItem(CLAVE_SEMESTRE) ?? "";
+    const guardado = localStorage.getItem(CLAVE_SEMESTRE) ?? "";
+    return SEMESTRES.some((s) => s.valor === guardado) ? guardado : "";
   } catch {
     return "";
   }
@@ -124,6 +129,11 @@ export const OcrUploader: React.FC<OcrUploaderProps> = ({
         setError(`El test ${tipoTest} requiere exactamente 2 fotografías (Página 1 y Página 2).`);
         return;
       }
+    }
+
+    if ((tipoTest === "AUDIT" || tipoTest === "BRIEF") && !semestre) {
+      setError("Elige el semestre del estudiante: 1.º u 8.º.");
+      return;
     }
 
     setCargando(true);
@@ -235,14 +245,16 @@ export const OcrUploader: React.FC<OcrUploaderProps> = ({
               onChange={(e) => cambiarSemestre(e.target.value)}
               className="min-h-11 sm:min-h-0 border border-slate-300 rounded-lg px-3 py-2 sm:py-1.5 text-sm bg-white"
             >
-              <option value="">Sin indicar</option>
+              <option value="" disabled>
+                Elegir semestre
+              </option>
               {SEMESTRES.map((s) => (
-                <option key={s} value={s}>
-                  {s}.º semestre
+                <option key={s.valor} value={s.valor}>
+                  {s.texto}
                 </option>
               ))}
             </select>
-            <p className="text-xs text-slate-500">Se usa para comparar AUDIT y BRIEF entre semestres. Queda elegido para los siguientes tests.</p>
+            <p className="text-xs text-slate-500">Solo 1.º u 8.º: son los dos grupos que compara el estudio. Queda elegido para los siguientes tests.</p>
           </div>
         )}
 
