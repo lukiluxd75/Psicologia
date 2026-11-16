@@ -56,6 +56,15 @@ export interface Analitica {
   registros_con_items: number;
   /** Registros normalizados (snake_case), sin nombres. */
   filas_crudas?: Record<string, unknown>[];
+  /** Solo AUDIT y BRIEF: la misma analítica para 1.º y 8.º semestre. */
+  por_semestre?: AnaliticaSemestre[];
+  /** Registros sin semestre (o con uno distinto de 1.º u 8.º): cuentan en "General" pero en ningún semestre. */
+  sin_semestre?: number;
+}
+
+export interface AnaliticaSemestre extends Omit<Analitica, "por_semestre" | "sin_semestre"> {
+  semestre: number;
+  etiqueta: string;
 }
 
 /** Punto de corte clínico; con `genero` solo aplica a ese sexo (p. ej. AUDIT: mujeres ≥ 4, hombres ≥ 5). */
@@ -76,6 +85,9 @@ export const JMV = {
   grid: "#e5e7eb",
   eje: "#6b7280",
 };
+
+/** Colores fijos por semestre, los mismos que usa la pestaña AUDIT × BRIEF. */
+export const COLOR_SEMESTRE: Record<number, string> = { 1: JMV.azul, 8: JMV.ambar };
 
 /** Colores con significado clínico (bajo → alto riesgo). El resto de categorías usa azul acero. */
 export const COLOR_CATEGORIA: Record<string, string> = {

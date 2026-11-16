@@ -166,6 +166,91 @@ export function interpretarGraficoFiabilidad(filas: Fiabilidad[]): string {
   return frases.join(" ");
 }
 
+/* ─── Comparación entre semestres ─────────────────────────────────────── */
+
+export interface GrupoInterp {
+  etiqueta: string;
+  descriptivas: Descriptiva[];
+}
+
+const AVISO_DESCRIPTIVO =
+  "Estas diferencias son descriptivas: para saber si son estadísticamente significativas, consulte la prueba t de la pestaña AUDIT × BRIEF por semestre.";
+
+/** Medias del puntaje global en cada grupo y la diferencia entre ellas. */
+export function interpretarComparacionDescriptivas(grupos: GrupoInterp[], variable: string): string {
+  const celdas = grupos.map((g) => ({ g, d: g.descriptivas.find((x) => x.variable === variable) }));
+  const validas = celdas.filter((c) => c.d && c.d.n > 0 && c.d.media !== null);
+  if (!validas.length) return "";
+  const etiqueta = validas[0].d!.etiqueta;
+  const partes = validas.map((c) => `el ${c.g.etiqueta} (n = ${c.d!.n}) obtuvo M = ${fmt(c.d!.media)} (DE = ${fmt(c.d!.de)})`);
+  const frases = [`En ${etiqueta}, ${partes.join(" y ")}.`];
+  if (validas.length === 2) {
+    const [a, b] = validas;
+    const dif = b.d!.media! - a.d!.media!;
+    if (Math.abs(dif) < 0.005) frases.push("Ambos semestres tienen la misma media.");
+    else frases.push(`La media del ${dif > 0 ? b.g.etiqueta : a.g.etiqueta} es ${fmt(Math.abs(dif))} puntos más alta.`);
+    frases.push(AVISO_DESCRIPTIVO);
+  }
+  const vacios = celdas.filter((c) => !c.d || c.d.n === 0);
+  if (vacios.length) frases.push(`No hay datos del ${vacios.map((c) => c.g.etiqueta).join(" ni del ")}.`);
+  return frases.join(" ");
+}
+
+/** En cuántas escalas cada semestre tiene la media más alta. */
+export function interpretarComparacionBoxplot(grupos: GrupoInterp[], escalas: { variable: string; etiqueta: string }[]): string {
+  if (grupos.length !== 2) return "";
+  const [a, b] = grupos;
+  const comparables = escalas.flatMap((e) => {
+    const da = a.descriptivas.find((d) => d.variable === e.variable);
+    const db = b.descriptivas.find((d) => d.variable === e.variable);
+    return da?.media != null && db?.media != null ? [{ e, dif: db.media - da.media }] : [];
+  });
+  if (!comparables.length) return "";
+  if (comparables.length === 1) {
+    const { e, dif } = comparables[0];
+    const mayor = dif > 0 ? b.etiqueta : a.etiqueta;
+    return Math.abs(dif) < 0.005
+      ? `En ${e.etiqueta} ambos semestres tienen la misma media. Compare también la dispersión de las cajas.`
+      : `En ${e.etiqueta} la media del ${mayor} es ${fmt(Math.abs(dif))} puntos más alta. Compare también la dispersión de las cajas: una caja más alta indica respuestas más heterogéneas.`;
+  }
+  const masB = comparables.filter((c) => c.dif > 0);
+  const mayor = [...comparables].sort((x, y) => Math.abs(y.dif) - Math.abs(x.dif))[0];
+  return [
+    `El ${b.etiqueta} tiene la media más alta en ${masB.length} de ${comparables.length} escalas y el ${a.etiqueta}, en ${comparables.length - masB.length}.`,
+    `La mayor diferencia está en ${mayor.e.etiqueta} (${fmt(Math.abs(mayor.dif))} puntos a favor del ${mayor.dif > 0 ? b.etiqueta : a.etiqueta}).`,
+    AVISO_DESCRIPTIVO,
+  ].join(" ");
+}
+
+/** Porcentaje de cada categoría dentro de cada grupo. */
+export function interpretarComparacionFrecuencias(etiqueta: string, grupos: { etiqueta: string; tabla: FilaFrecuencia[] }[]): string {
+  const categorias = [...new Set(grupos.flatMap((g) => g.tabla.map((f) => f.categoria)))];
+  if (!categorias.length) return "";
+  const frases = categorias.map((c) => {
+    const partes = grupos.map((g) => {
+      const f = g.tabla.find((x) => x.categoria === c);
+      return `${f ? f.porcentaje.toFixed(1) : "0.0"} % en ${g.etiqueta}`;
+    });
+    return `${c}: ${partes.join(" frente a ")}`;
+  });
+  return `Distribución de ${etiqueta} dentro de cada semestre. ${frases.join("; ")}. Los porcentajes se calculan sobre el total de cada semestre, por eso son comparables aunque los grupos tengan distinto tamaño.`;
+}
+
+/** Cuántas escalas alcanzan α ≥ .70 en cada grupo. */
+export function interpretarComparacionFiabilidad(grupos: { etiqueta: string; filas: Fiabilidad[] }[]): string {
+  const frases = grupos.flatMap((g) => {
+    const escalas = g.filas.filter((f) => f.escala !== "total" && f.alfa !== null);
+    const total = g.filas.find((f) => f.escala === "total" && f.alfa !== null);
+    if (!escalas.length && !total) return [`En el ${g.etiqueta} no hay casos completos suficientes para calcular el α.`];
+    const partes = [];
+    if (escalas.length) partes.push(`${escalas.filter((f) => f.alfa! >= 0.7).length} de ${escalas.length} escalas alcanzan α ≥ .70`);
+    if (total) partes.push(`la escala total obtiene α = ${alfa(total.alfa)}`);
+    return [`En el ${g.etiqueta}, ${partes.join(" y ")}.`];
+  });
+  if (grupos.some((g) => g.filas.some((f) => f.n > 0 && f.n < 30))) frases.push("Con menos de 30 casos por semestre, estos valores son orientativos.");
+  return frases.join(" ");
+}
+
 /** Magnitud de la d de Cohen (1988). */
 export function magnitudD(d: number | null | undefined): string {
   if (d === null || d === undefined) return "";

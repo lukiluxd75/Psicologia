@@ -20,6 +20,10 @@ from services.sheets_service import ITEMS_POR_TEST, cabecera_item
 
 TESTS_SOPORTADOS = ("AUDIT", "BRIEF", "PASS", "PSICOSOCIAL")
 
+# Solo AUDIT y BRIEF registran semestre; el estudio compara 1.º y 8.º.
+TESTS_CON_SEMESTRE = ("AUDIT", "BRIEF")
+SEMESTRES_ESTUDIO = (1, 8)
+
 # El OCR y los formularios guardan 0 cuando el dato no se leyó o no aplica
 # (p. ej. semanas de embarazo en etapa posnatal): se tratan como perdidos.
 CERO_ES_PERDIDO = {"edad", "semanas_embarazo", "semanas_gestacion"}
@@ -412,6 +416,10 @@ def normalizar_filas(tipo_test: str, filas: list[dict], incluir_nombres: bool = 
                 reg["item7_puntaje"] = _item7_puntaje(crudo)
         for num in ITEMS_POR_TEST[tipo_test.upper()]:
             reg[nombre_item(num)] = _a_numero(_valor_columna(fila, cabecera_item(num)))
+        if tipo_test.upper() in TESTS_CON_SEMESTRE:
+            # Import diferido: correlacion_service importa este módulo
+            from services.correlacion_service import parsear_semestre
+            reg["semestre"] = parsear_semestre(_valor_columna(fila, "Semestre"))
         normalizadas.append(reg)
     return normalizadas
 
@@ -420,11 +428,7 @@ def normalizar_filas(tipo_test: str, filas: list[dict], incluir_nombres: bool = 
 # API pública
 # ---------------------------------------------------------------------------
 
-def generar_analitica_jamovi(tipo_test: str, filas_sheets: list[dict]) -> dict:
-    tipo = tipo_test.upper()
-    esquema = _validar_tipo(tipo)
-    registros = normalizar_filas(tipo, filas_sheets)
-
+def _analitica_de_registros(tipo: str, esquema: dict, registros: list[dict]) -> dict:
     descriptivas = [
         calcular_descriptivas_variable(
             [r[snake] for r in registros], snake, maximo_teorico=maximo,
@@ -457,6 +461,25 @@ def generar_analitica_jamovi(tipo_test: str, filas_sheets: list[dict]) -> dict:
     }
 
 
+def generar_analitica_jamovi(tipo_test: str, filas_sheets: list[dict]) -> dict:
+    tipo = tipo_test.upper()
+    esquema = _validar_tipo(tipo)
+    registros = normalizar_filas(tipo, filas_sheets)
+    analitica = _analitica_de_registros(tipo, esquema, registros)
+    if tipo in TESTS_CON_SEMESTRE:
+        # La misma analítica para cada semestre del estudio: la usan las vistas por semestre y la comparación.
+        analitica["por_semestre"] = [
+            {
+                "semestre": s,
+                "etiqueta": f"{s}.º semestre",
+                **_analitica_de_registros(tipo, esquema, [r for r in registros if r.get("semestre") == s]),
+            }
+            for s in SEMESTRES_ESTUDIO
+        ]
+        analitica["sin_semestre"] = sum(1 for r in registros if r.get("semestre") not in SEMESTRES_ESTUDIO)
+    return analitica
+
+
 def generar_csv_jamovi(tipo_test: str, filas_sheets: list[dict], incluir_nombres: bool = False) -> str:
     """
     CSV con cabeceras snake_case. Cada categórica con codificación conocida lleva además
@@ -467,6 +490,8 @@ def generar_csv_jamovi(tipo_test: str, filas_sheets: list[dict], incluir_nombres
     registros = normalizar_filas(tipo, filas_sheets, incluir_nombres=incluir_nombres)
 
     columnas = ["id_caso"] + (["nombre"] if incluir_nombres else [])
+    if tipo in TESTS_CON_SEMESTRE:
+        columnas.append("semestre")
     columnas += [snake for _, snake, *_ in esquema["numericas"]]
     for _, snake, _, _, codigos in esquema["categoricas"]:
         columnas.append(snake)
@@ -518,6 +543,13 @@ def generar_sav_jamovi(tipo_test: str, filas_sheets: list[dict], incluir_nombres
         datos["nombre"] = [r.get("nombre") or "" for r in registros]
         etiquetas["nombre"] = "Nombre"
         medida["nombre"] = "nominal"
+
+    if tipo in TESTS_CON_SEMESTRE:
+        # Nominal con etiquetas: en Jamovi se usa directamente en "Dividir por"
+        datos["semestre"] = [r.get("semestre") for r in registros]
+        etiquetas["semestre"] = "Semestre"
+        medida["semestre"] = "nominal"
+        etiquetas_valor["semestre"] = {float(s): f"{s}.º semestre" for s in sorted({*SEMESTRES_ESTUDIO, *(r["semestre"] for r in registros if r.get("semestre"))})}
 
     for _, snake, etiqueta, minimo, maximo in esquema["numericas"]:
         datos[snake] = [r[snake] for r in registros]
