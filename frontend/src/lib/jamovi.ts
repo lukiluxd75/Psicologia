@@ -338,7 +338,10 @@ export function descargarBlob(blob: Blob, nombre: string) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-export async function descargarSvgComoPng(svg: SVGSVGElement, nombre: string, escala = 2): Promise<void> {
+/** ~300 ppp para una figura a lo ancho de una página de Word. */
+const ESCALA_PNG = 3;
+
+export async function descargarSvgComoPng(svg: SVGSVGElement, nombre: string, escala = ESCALA_PNG): Promise<void> {
   descargarBlob(await svgAPng(svg, escala), nombre);
 }
 
@@ -351,7 +354,7 @@ export const portapapelesDisponible = () =>
  * Se pasa la promesa al ClipboardItem (no el blob resuelto) para que Safari
  * conserve el gesto del usuario mientras se rasteriza.
  */
-export async function copiarSvgAlPortapapeles(svg: SVGSVGElement, escala = 2): Promise<void> {
+export async function copiarSvgAlPortapapeles(svg: SVGSVGElement, escala = ESCALA_PNG): Promise<void> {
   if (!portapapelesDisponible()) throw new Error("Portapapeles no disponible");
   await navigator.clipboard.write([new ClipboardItem({ "image/png": svgAPng(svg, escala) })]);
 }
@@ -439,13 +442,17 @@ export function svgConLeyendaApa(svg: SVGSVGElement, { numero, titulo, nota }: L
   return raiz;
 }
 
-/** Rasteriza un <svg> a PNG a escala 2x con fondo blanco. Los estilos deben ir como atributos. */
-export function svgAPng(svg: SVGSVGElement, escala = 2): Promise<Blob> {
+/**
+ * Rasteriza un <svg> a PNG con fondo blanco. Los estilos deben ir como atributos.
+ * El clon se declara ya al tamaño final: Safari y Chrome en el móvil rasterizan el SVG
+ * a su tamaño intrínseco y luego estiran ese mapa de bits, lo que deja la imagen borrosa.
+ */
+export function svgAPng(svg: SVGSVGElement, escala = ESCALA_PNG): Promise<Blob> {
   const { width, height } = svg.viewBox.baseVal;
   const clon = svg.cloneNode(true) as SVGSVGElement;
   clon.setAttribute("xmlns", "http://www.w3.org/2000/svg");
-  clon.setAttribute("width", String(width));
-  clon.setAttribute("height", String(height));
+  clon.setAttribute("width", String(width * escala));
+  clon.setAttribute("height", String(height * escala));
   const datos = new XMLSerializer().serializeToString(clon);
   const url = URL.createObjectURL(new Blob([datos], { type: "image/svg+xml;charset=utf-8" }));
 
