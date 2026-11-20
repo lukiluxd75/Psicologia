@@ -30,6 +30,21 @@ ORDINALES = {
     "sexto": 6, "septimo": 7, "setimo": 7, "octavo": 8, "noveno": 9, "decimo": 10,
 }
 
+# Dominios del AUDIT (Babor et al., 2001, OMS): ítems que suma cada uno.
+DOMINIOS_AUDIT = [
+    ("audit_consumo_riesgo", "AUDIT: Consumo de riesgo", (1, 2, 3)),
+    ("audit_dependencia", "AUDIT: Síntomas de dependencia", (4, 5, 6)),
+    ("audit_consumo_perjudicial", "AUDIT: Consumo perjudicial", (7, 8, 9, 10)),
+]
+
+# Índices del BRIEF-A (Roth et al., 2005): suma de sus escalas clínicas.
+INDICES_BRIEF = [
+    ("indice_regulacion_conductual", "BRIEF-A: Índice de Regulación Conductual (BRI)",
+     ("inhibicion", "flexibilidad", "control_emocional", "automonitoreo")),
+    ("indice_metacognicion", "BRIEF-A: Índice de Metacognición (MI)",
+     ("iniciativa", "memoria_trabajo", "planificacion_organizacion", "monitoreo_tareas", "organizacion_materiales")),
+]
+
 # Por debajo de este parecido dos nombres se consideran personas distintas.
 SIMILITUD_MINIMA = 0.88
 
@@ -332,9 +347,16 @@ def _registros(filas: list[dict], tipo: str) -> list[dict]:
             reg["diagnostico"] = str(_valor_columna(fila, "Diagnóstico") or "").strip()
             if reg["audit"] is None:
                 continue
+            # El dominio solo se calcula si están todos sus ítems (filas antiguas no los guardaban).
+            for snake, _, items in DOMINIOS_AUDIT:
+                valores = [_a_numero(_valor_columna(fila, f"Ítem {i}")) for i in items]
+                reg[snake] = None if any(v is None for v in valores) else sum(valores)
         else:
             for cab, snake, _ in ESCALAS_BRIEF:
                 reg[snake] = _a_numero(_valor_columna(fila, cab))
+            for snake, _, escalas in INDICES_BRIEF:
+                valores = [reg[e] for e in escalas]
+                reg[snake] = None if any(v is None for v in valores) else sum(valores)
             reg["alerta_entrevista"] = str(_valor_columna(fila, "Alerta Entrevista") or "").strip()
             if reg["total_general"] is None:
                 continue
@@ -393,7 +415,11 @@ def emparejar(filas_audit: list[dict], filas_brief: list[dict]) -> dict:
             "diagnostico": a["diagnostico"],
             "alerta_entrevista": b["alerta_entrevista"],
         }
+        for snake, _, _ in DOMINIOS_AUDIT:
+            persona[snake] = a[snake]
         for _, snake, _ in ESCALAS_BRIEF:
+            persona[snake] = b[snake]
+        for snake, _, _ in INDICES_BRIEF:
             persona[snake] = b[snake]
         personas.append(persona)
     personas.sort(key=lambda p: (p["semestre"] or 99, p["nombre"].lower()))
@@ -445,6 +471,49 @@ def _analizar_grupo(personas: list[dict], etiqueta: str, semestre: int | None) -
     }
 
 
+def variables_matriz() -> list[tuple[str, str, str]]:
+    """(snake, etiqueta, test) en el orden de la matriz: primero el AUDIT y después el BRIEF-A."""
+    escalas = [(snake, f"BRIEF-A: {nombre}", "BRIEF") for _, snake, nombre in ESCALAS_BRIEF
+               if not snake.startswith("subtotal") and snake != "total_general"]
+    return [
+        ("audit", "AUDIT: Puntaje total", "AUDIT"),
+        *[(snake, et, "AUDIT") for snake, et, _ in DOMINIOS_AUDIT],
+        *escalas,
+        *[(snake, et, "BRIEF") for snake, et, _ in INDICES_BRIEF],
+        ("total_general", "BRIEF-A: Índice Global (GEC, Total General)", "BRIEF"),
+    ]
+
+
+def matriz_correlacion(personas: list[dict], etiqueta: str, semestre: int | None) -> dict:
+    """
+    Matriz de correlaciones de Pearson entre todas las variables del AUDIT y del BRIEF-A
+    (como Jamovi: Regresión → Matriz de correlación). Cada par usa los casos que tienen
+    los dos valores (eliminación por pares), por eso cada celda lleva su propio n.
+    """
+    variables = []
+    for snake, nombre, test in variables_matriz():
+        valores = [p[snake] for p in personas if p.get(snake) is not None]
+        variables.append({"clave": snake, "etiqueta": nombre, "test": test, **descriptivas(valores)})
+    # Una variable sin datos (p. ej. dominios del AUDIT cuando no se guardaron los ítems) no entra.
+    variables = [v for v in variables if v["n"] > 0]
+
+    celdas = []
+    for i, vi in enumerate(variables):
+        fila = []
+        for j, vj in enumerate(variables[:i]):
+            pares = [(p[vi["clave"]], p[vj["clave"]]) for p in personas
+                     if p.get(vi["clave"]) is not None and p.get(vj["clave"]) is not None]
+            n = len(pares)
+            r = _pearson_r([a for a, _ in pares], [b for _, b in pares])
+            fila.append({
+                "n": n,
+                "r": None if r is None else round(r, 3),
+                "p": None if r is None else round(_p_de_r(r, n), 4),
+            })
+        celdas.append(fila)
+    return {"semestre": semestre, "etiqueta": etiqueta, "n": len(personas), "variables": variables, "celdas": celdas}
+
+
 def generar_correlacion(filas_audit: list[dict], filas_brief: list[dict], semestre_a: int = 1, semestre_b: int = 8) -> dict:
     emp = emparejar(filas_audit, filas_brief)
     personas = emp["personas"]
@@ -456,6 +525,10 @@ def generar_correlacion(filas_audit: list[dict], filas_brief: list[dict], semest
         for s in semestres
     ]
     total = _analizar_grupo(personas, "Muestra total", None)
+    matrices = [
+        matriz_correlacion([p for p in con_semestre if p["semestre"] == s], f"{s}.º semestre", s)
+        for s in semestres
+    ] + [matriz_correlacion(personas, "Muestra total", None)]
 
     ga = [p for p in con_semestre if p["semestre"] == semestre_a]
     gb = [p for p in con_semestre if p["semestre"] == semestre_b]
@@ -485,6 +558,7 @@ def generar_correlacion(filas_audit: list[dict], filas_brief: list[dict], semest
         "semestres": semestres,
         "grupos": grupos,
         "total": total,
+        "matrices": matrices,
         "promedio_semestres": _limpiar_p(promediar_correlaciones(
             [(g["etiqueta"], g["correlacion"]["r"], g["n"]) for g in grupos]
         )),
@@ -497,7 +571,9 @@ def generar_csv_correlacion(filas_audit: list[dict], filas_brief: list[dict], in
     personas = emparejar(filas_audit, filas_brief)["personas"]
     columnas = ["id_caso"] + (["nombre"] if incluir_nombres else []) + [
         "semestre", "edad", "genero", "audit_total", "audit_diagnostico",
-    ] + [snake for _, snake, _ in ESCALAS_BRIEF] + ["brief_alerta_entrevista"]
+    ] + [snake for snake, _, _ in DOMINIOS_AUDIT] + [snake for _, snake, _ in ESCALAS_BRIEF] + [
+        snake for snake, _, _ in INDICES_BRIEF
+    ] + ["brief_alerta_entrevista"]
 
     buffer = io.StringIO()
     escritor = csv.writer(buffer, lineterminator="\n")
@@ -513,6 +589,8 @@ def generar_csv_correlacion(filas_audit: list[dict], filas_brief: list[dict], in
             "audit_diagnostico": p["diagnostico"],
             "brief_alerta_entrevista": p["alerta_entrevista"],
             **{snake: p[snake] for _, snake, _ in ESCALAS_BRIEF},
+            **{snake: p[snake] for snake, _, _ in DOMINIOS_AUDIT},
+            **{snake: p[snake] for snake, _, _ in INDICES_BRIEF},
         }
         fila = []
         for col in columnas:

@@ -38,6 +38,30 @@ interface Grupo {
   correlacion_escalas: (Corr & { escala: string; etiqueta: string })[];
 }
 
+interface VariableMatriz {
+  clave: string;
+  etiqueta: string;
+  test: "AUDIT" | "BRIEF";
+  n: number;
+  media: number | null;
+  de: number | null;
+}
+
+interface CeldaMatriz {
+  n: number;
+  r: number | null;
+  p: number | null;
+}
+
+interface Matriz {
+  semestre: number | null;
+  etiqueta: string;
+  n: number;
+  variables: VariableMatriz[];
+  /** Triángulo inferior: celdas[i][j] con j < i. */
+  celdas: CeldaMatriz[][];
+}
+
 interface Persona {
   nombre: string;
   semestre: number | null;
@@ -81,6 +105,7 @@ interface Resultado {
   semestres: number[];
   grupos: Grupo[];
   total: Grupo;
+  matrices: Matriz[];
   promedio_semestres: Promedio | null;
   comparacion: {
     semestre_a: number;
@@ -442,6 +467,119 @@ function interpretarEscalas(total: Grupo): string {
   return frases.join(" ");
 }
 
+/* ─── Matriz de correlaciones AUDIT × BRIEF-A ────────────────────────── */
+
+type Conjunto = "indices" | "completa";
+
+// Versión resumida: AUDIT (total y dominios) frente a los índices del BRIEF-A.
+const CLAVES_INDICES = new Set([
+  "audit",
+  "audit_consumo_riesgo",
+  "audit_dependencia",
+  "audit_consumo_perjudicial",
+  "indice_regulacion_conductual",
+  "indice_metacognicion",
+  "total_general",
+]);
+
+interface MatrizVista {
+  variables: VariableMatriz[];
+  /** Celda del triángulo inferior (i > j). */
+  celda: (i: number, j: number) => CeldaMatriz;
+}
+
+function recortarMatriz(m: Matriz, conjunto: Conjunto): MatrizVista {
+  const indices = m.variables.map((_, i) => i).filter((i) => conjunto === "completa" || CLAVES_INDICES.has(m.variables[i].clave));
+  return {
+    variables: indices.map((i) => m.variables[i]),
+    celda: (i, j) => m.celdas[indices[i]][indices[j]],
+  };
+}
+
+function copiaMatriz(v: MatrizVista): CopiaTabla {
+  const k = v.variables.length;
+  return {
+    cabeceras: ["Variable", "M", "DE", ...Array.from({ length: k }, (_, i) => String(i + 1))],
+    filas: v.variables.map((vi, i) => [
+      `${i + 1}. ${vi.etiqueta}`,
+      fmt(vi.media),
+      fmt(vi.de),
+      ...Array.from({ length: k }, (_, j) => {
+        if (j === i) return "—";
+        if (j > i) return "";
+        const c = v.celda(i, j);
+        return `${sinCero(c.r)}${estrellas(c.p)}`;
+      }),
+    ]),
+  };
+}
+
+function notaMatriz(m: Matriz, v: MatrizVista): string {
+  const ns = v.variables.flatMap((_, i) => v.variables.slice(0, i).map((__, j) => v.celda(i, j).n));
+  const nMin = Math.min(...ns);
+  const nMax = Math.max(...ns);
+  const nTexto = nMin === nMax ? `n = ${nMin}` : `n entre ${nMin} y ${nMax} según el par (eliminación por pares)`;
+  const sinDominios = !v.variables.some((x) => x.clave === "audit_consumo_riesgo");
+  return (
+    `${m.etiqueta}, ${nTexto}. M = media; DE = desviación estándar; valores = r de Pearson. ` +
+    "Dominios del AUDIT: consumo de riesgo (ítems 1–3), síntomas de dependencia (4–6) y consumo perjudicial (7–10). " +
+    "BRI = Inhibición + Flexibilidad + Control Emocional + Automonitoreo; MI = Iniciativa + Memoria de Trabajo + " +
+    "Planificación/Organización + Monitoreo de Tareas + Organización de Materiales; GEC = Total General. " +
+    "Las correlaciones de un total con sus propias escalas son altas por construcción. " +
+    (sinDominios ? "Los dominios del AUDIT no aparecen porque los registros no tienen las respuestas ítem por ítem. " : "") +
+    "* p < .05; ** p < .01."
+  );
+}
+
+/** Magnitud según Cohen (1988), igual que el backend. */
+function magnitudR(r: number): string {
+  const a = Math.abs(r);
+  const mag = a < 0.1 ? "nula" : a < 0.3 ? "débil" : a < 0.5 ? "moderada" : "fuerte";
+  return mag === "nula" ? mag : `${mag} ${r > 0 ? "positiva" : "negativa"}`;
+}
+
+function interpretarMatriz(m: Matriz, v: MatrizVista): string {
+  const cruzadas: { audit: VariableMatriz; brief: VariableMatriz; r: number; p: number | null }[] = [];
+  v.variables.forEach((vi, i) =>
+    v.variables.slice(0, i).forEach((vj, j) => {
+      if (vi.test === vj.test) return;
+      const c = v.celda(i, j);
+      if (c.r === null) return;
+      const [a, b] = vi.test === "AUDIT" ? [vi, vj] : [vj, vi];
+      cruzadas.push({ audit: a, brief: b, r: c.r, p: c.p });
+    })
+  );
+  const grupo = m.etiqueta.toLowerCase();
+  if (!cruzadas.length) return `En ${grupo} todavía no hay casos suficientes para calcular la matriz (se necesitan al menos 3).`;
+
+  const corto = (x: VariableMatriz) => x.etiqueta.replace(/^(AUDIT|BRIEF-A): /, "");
+  const sig = cruzadas.filter((c) => significativa(c.p)).sort((a, b) => Math.abs(b.r) - Math.abs(a.r));
+  const frases: string[] = [];
+  if (!sig.length) {
+    const rs = cruzadas.map((c) => c.r);
+    frases.push(
+      `En ${grupo} (n = ${m.n}), ninguna de las ${cruzadas.length} correlaciones entre el AUDIT y el BRIEF-A fue estadísticamente significativa ` +
+        `(r entre ${sinCero(Math.min(...rs))} y ${sinCero(Math.max(...rs))}).`
+    );
+    return frases.join(" ");
+  }
+  frases.push(
+    `En ${grupo} (n = ${m.n}), ${sig.length} de las ${cruzadas.length} correlaciones entre el AUDIT y el BRIEF-A fueron estadísticamente significativas: ` +
+      sig.map((c) => `${corto(c.audit)} (AUDIT) con ${corto(c.brief)} (r = ${sinCero(c.r)}, ${pTexto(c.p)}, ${magnitudR(c.r)})`).join("; ") +
+      "."
+  );
+  const positivas = sig.filter((c) => c.r > 0).length;
+  if (positivas === sig.length)
+    frases.push("Todas son positivas: a mayor consumo de alcohol, más dificultades en la función ejecutiva (puntajes BRIEF-A más altos).");
+  else if (positivas === 0)
+    frases.push("Todas son negativas: a mayor consumo de alcohol, puntajes BRIEF-A más bajos, es decir, menos dificultades ejecutivas reportadas.");
+  if (cruzadas.length > 6)
+    frases.push(
+      "Al calcular muchas correlaciones a la vez aumenta la probabilidad de que alguna salga significativa por azar: interprete con cautela las que estén cerca de p = .05."
+    );
+  return frases.join(" ");
+}
+
 /* ─── Vista ──────────────────────────────────────────────────────────── */
 
 const notaPromedio = (pm: Promedio) =>
@@ -458,6 +596,8 @@ export const CorrelacionView: React.FC<{ historial: HistorialLocal }> = ({ histo
   const [recarga, setRecarga] = useState(0);
   const [incluirNombres, setIncluirNombres] = useState(false);
   const [copiado, setCopiado] = useState(false);
+  const [grupoMatriz, setGrupoMatriz] = useState("total");
+  const [conjunto, setConjunto] = useState<Conjunto>("indices");
   const [error, setError] = useState<string | null>(null);
 
   // Con "sheets" se mandan solo los registros locales que aún no llegaron a Sheets, para no duplicarlos.
@@ -523,6 +663,10 @@ export const CorrelacionView: React.FC<{ historial: HistorialLocal }> = ({ histo
   const cmp = datos?.comparacion;
   const filasTabla = datos ? [...grupos, datos.total] : [];
   const pm = datos?.promedio_semestres ?? null;
+  const claveMatriz = (m: Matriz) => (m.semestre === null ? "total" : String(m.semestre));
+  const matrices = datos?.matrices ?? [];
+  const matriz = matrices.find((m) => claveMatriz(m) === grupoMatriz) ?? matrices[matrices.length - 1];
+  const vistaMatriz = matriz ? recortarMatriz(matriz, conjunto) : null;
 
   // Definición única de las 4 tablas: se usa para pintarlas, copiarlas una a una y copiarlas todas.
   type DefTabla = { numero: number; titulo: string; nota: string; copia: CopiaTabla; interp: string };
@@ -588,6 +732,17 @@ export const CorrelacionView: React.FC<{ historial: HistorialLocal }> = ({ histo
             },
             interp: interpretarEscalas(datos.total),
           },
+          ...(matriz && vistaMatriz
+            ? [
+                {
+                  numero: 5,
+                  titulo: `Matriz de correlaciones entre el consumo de alcohol (AUDIT) y la función ejecutiva (BRIEF-A): ${matriz.etiqueta.toLowerCase()}`,
+                  nota: notaMatriz(matriz, vistaMatriz),
+                  copia: copiaMatriz(vistaMatriz),
+                  interp: interpretarMatriz(matriz, vistaMatriz),
+                },
+              ]
+            : []),
         ]
       : [];
 
@@ -611,7 +766,7 @@ export const CorrelacionView: React.FC<{ historial: HistorialLocal }> = ({ histo
       html,
       texto,
       "Tablas y resultados copiados",
-      "Pégalos en Word con Ctrl+V: 4 tablas APA, cada una con su interpretación, y el párrafo de resultados."
+      `Pégalos en Word con Ctrl+V: ${tablas.length} tablas APA, cada una con su interpretación, y el párrafo de resultados.`
     );
     if (ok) {
       setCopiado(true);
@@ -875,6 +1030,75 @@ export const CorrelacionView: React.FC<{ historial: HistorialLocal }> = ({ histo
               </tbody>
             </TablaApa>
           </section>
+
+          {matriz && vistaMatriz && tablas.length > 4 && (
+            <section className="bg-white border border-slate-200 rounded-xl p-4 sm:p-5 space-y-4">
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                <label className="flex items-center gap-2 text-sm text-slate-700">
+                  Grupo
+                  <select value={claveMatriz(matriz)} onChange={(e) => setGrupoMatriz(e.target.value)} className={selectCls}>
+                    {matrices.map((m) => (
+                      <option key={claveMatriz(m)} value={claveMatriz(m)}>
+                        {m.etiqueta} (n = {m.n})
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="flex items-center gap-2 text-sm text-slate-700">
+                  Variables
+                  <select value={conjunto} onChange={(e) => setConjunto(e.target.value as Conjunto)} className={selectCls}>
+                    <option value="indices">AUDIT y dominios × índices del BRIEF-A</option>
+                    <option value="completa">AUDIT y dominios × todas las escalas del BRIEF-A</option>
+                  </select>
+                </label>
+                <p className="text-xs text-slate-500">Celdas sombreadas: correlación entre un test y el otro.</p>
+              </div>
+              <TablaApa {...propsTabla(4)}>
+                <thead>
+                  <tr>
+                    <th className={`${TH} text-left`}>Variable</th>
+                    <th className={`${TH} text-right`}>M</th>
+                    <th className={`${TH} text-right`}>DE</th>
+                    {vistaMatriz.variables.map((v, j) => (
+                      <th key={v.clave} className={`${TH} text-right`}>
+                        {j + 1}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {vistaMatriz.variables.map((vi, i) => (
+                    <tr key={vi.clave}>
+                      <td className={`${TD} text-left`}>
+                        {i + 1}. {vi.etiqueta}
+                      </td>
+                      <td className={`${TD} text-right`}>{fmt(vi.media)}</td>
+                      <td className={`${TD} text-right`}>{fmt(vi.de)}</td>
+                      {vistaMatriz.variables.map((vj, j) => {
+                        if (j >= i)
+                          return (
+                            <td key={vj.clave} className={`${TD} text-center text-slate-400`}>
+                              {j === i ? "—" : ""}
+                            </td>
+                          );
+                        const c = vistaMatriz.celda(i, j);
+                        return (
+                          <td
+                            key={vj.clave}
+                            className={`${TD} text-right ${vi.test !== vj.test ? "bg-sky-50" : ""}`}
+                            title={`${vi.etiqueta} × ${vj.etiqueta}: r = ${sinCero(c.r)}, ${pTexto(c.p)}, n = ${c.n}`}
+                          >
+                            {sinCero(c.r)}
+                            {estrellas(c.p)}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </TablaApa>
+            </section>
+          )}
 
           <details className="bg-white border border-slate-200 rounded-xl p-4 text-sm">
             <summary className="cursor-pointer font-semibold text-slate-900">
