@@ -65,6 +65,8 @@ export interface Analitica {
 export interface AnaliticaSemestre extends Omit<Analitica, "por_semestre" | "sin_semestre"> {
   semestre: number;
   etiqueta: string;
+  /** Registros del semestre antes de aplicar el límite de personas (total_registros es lo que se analiza). */
+  disponibles?: number;
 }
 
 /** Punto de corte clínico; con `genero` solo aplica a ese sexo (p. ej. AUDIT: mujeres ≥ 4, hombres ≥ 5). */

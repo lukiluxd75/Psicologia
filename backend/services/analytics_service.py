@@ -461,20 +461,30 @@ def _analitica_de_registros(tipo: str, esquema: dict, registros: list[dict]) -> 
     }
 
 
-def generar_analitica_jamovi(tipo_test: str, filas_sheets: list[dict]) -> dict:
+def _grupo_semestre(tipo: str, esquema: dict, registros: list[dict], semestre: int, limite: int | None) -> dict:
+    """Analítica de un semestre. Con `limite`, solo los primeros N registros en orden de registro."""
+    del_semestre = [r for r in registros if r.get("semestre") == semestre]
+    usados = del_semestre[:limite] if limite and limite > 0 else del_semestre
+    return {
+        "semestre": semestre,
+        "etiqueta": f"{semestre}.º semestre",
+        "disponibles": len(del_semestre),
+        **_analitica_de_registros(tipo, esquema, usados),
+    }
+
+
+def generar_analitica_jamovi(
+    tipo_test: str, filas_sheets: list[dict], limites_semestre: dict[int, int | None] | None = None
+) -> dict:
     tipo = tipo_test.upper()
     esquema = _validar_tipo(tipo)
     registros = normalizar_filas(tipo, filas_sheets)
     analitica = _analitica_de_registros(tipo, esquema, registros)
     if tipo in TESTS_CON_SEMESTRE:
         # La misma analítica para cada semestre del estudio: la usan las vistas por semestre y la comparación.
+        limites = limites_semestre or {}
         analitica["por_semestre"] = [
-            {
-                "semestre": s,
-                "etiqueta": f"{s}.º semestre",
-                **_analitica_de_registros(tipo, esquema, [r for r in registros if r.get("semestre") == s]),
-            }
-            for s in SEMESTRES_ESTUDIO
+            _grupo_semestre(tipo, esquema, registros, s, limites.get(s)) for s in SEMESTRES_ESTUDIO
         ]
         analitica["sin_semestre"] = sum(1 for r in registros if r.get("semestre") not in SEMESTRES_ESTUDIO)
     return analitica

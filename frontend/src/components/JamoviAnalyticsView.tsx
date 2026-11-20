@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { ClipboardCopy, Download, RefreshCw, Check, AlertTriangle } from "lucide-react";
 import {
   descargarBlob,
@@ -27,6 +27,7 @@ import { CorrelacionView } from "./CorrelacionView";
 import { CitaJamovi } from "./jamovi/CitaJamovi";
 import { ComparacionSemestres } from "./jamovi/ComparacionSemestres";
 import { bloquesComparacion } from "../lib/comparacion";
+import { PersonasPorSemestre, type Limites } from "./jamovi/PersonasPorSemestre";
 
 type Fuente = "sheets" | "local" | "combinado";
 /** Qué parte de la muestra se analiza (solo AUDIT y BRIEF registran semestre). */
@@ -46,6 +47,25 @@ const FUENTES: { id: Fuente; etiqueta: string }[] = [
 ];
 
 const apiBase = import.meta.env.VITE_API_URL || "";
+
+/** Personas por semestre elegidas para cada test; se recuerdan entre visitas. */
+const CLAVE_LIMITES = "jamovi_personas_por_semestre";
+
+function leerLimites(): Partial<Record<TipoTest, Limites>> {
+  try {
+    const v = JSON.parse(localStorage.getItem(CLAVE_LIMITES) ?? "{}");
+    return v && typeof v === "object" ? v : {};
+  } catch {
+    return {};
+  }
+}
+
+/** Parámetros max_1, max_8… para la API (vacío si no hay límites). */
+const paramsLimites = (l: Limites) =>
+  Object.entries(l)
+    .filter(([, n]) => typeof n === "number" && n > 0)
+    .map(([s, n]) => `max_${s}=${n}`)
+    .join("&");
 
 async function leerError(res: Response): Promise<string> {
   try {
@@ -244,9 +264,26 @@ export const JamoviAnalyticsView: React.FC<{ historial: HistorialLocal }> = ({ h
   const [descargando, setDescargando] = useState<"sav" | "csv" | null>(null);
   const [copiado, setCopiado] = useState(false);
   const [muestra, setMuestra] = useState<Muestra>("general");
+  const [limitesPorTest, setLimitesPorTest] = useState(leerLimites);
+  const limites = useMemo(() => limitesPorTest[tipo] ?? {}, [limitesPorTest, tipo]);
+  const qsLimites = paramsLimites(limites);
 
-  // Cada combinación test/fuente/recarga es una petición; "cargando" se deriva de si su respuesta ya llegó.
-  const clave = `${tipo}|${fuente}|${recarga}`;
+  const guardarLimites = useCallback(
+    (nuevos: Limites) =>
+      setLimitesPorTest((prev) => {
+        const todo = { ...prev, [tipo]: nuevos };
+        localStorage.setItem(CLAVE_LIMITES, JSON.stringify(todo));
+        return todo;
+      }),
+    [tipo]
+  );
+  const cambiarLimite = useCallback(
+    (semestre: number, n: number | null) => guardarLimites({ ...limites, [semestre]: n }),
+    [guardarLimites, limites]
+  );
+
+  // Cada combinación test/fuente/recarga/límites es una petición; "cargando" se deriva de si su respuesta ya llegó.
+  const clave = `${tipo}|${fuente}|${recarga}|${qsLimites}`;
   const [resultado, setResultado] = useState<{ clave: string; datos: Analitica | null; error: string | null }>({
     clave: "",
     datos: null,
@@ -270,10 +307,11 @@ export const JamoviAnalyticsView: React.FC<{ historial: HistorialLocal }> = ({ h
     (async () => {
       try {
         const locales = filasDesdeHistorial(tipo, historial);
+        const extra = qsLimites ? `&${qsLimites}` : "";
         const res =
           fuente === "sheets"
-            ? await fetch(`${apiBase}/api/analytics/${tipo}`)
-            : await fetch(`${apiBase}/api/analytics/${tipo}/from-local?incluir_sheets=${fuente === "combinado"}`, {
+            ? await fetch(`${apiBase}/api/analytics/${tipo}${qsLimites ? `?${qsLimites}` : ""}`)
+            : await fetch(`${apiBase}/api/analytics/${tipo}/from-local?incluir_sheets=${fuente === "combinado"}${extra}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ registros: locales }),
@@ -295,7 +333,7 @@ export const JamoviAnalyticsView: React.FC<{ historial: HistorialLocal }> = ({ h
     return () => {
       vigente = false;
     };
-  }, [clave, tipo, fuente, historial]);
+  }, [clave, tipo, fuente, historial, qsLimites]);
 
   const descargarDataset = async (formato: "sav" | "csv") => {
     setDescargando(formato);
@@ -521,7 +559,10 @@ export const JamoviAnalyticsView: React.FC<{ historial: HistorialLocal }> = ({ h
               {(
                 [
                   ["general", `General (${datosTodos.total_registros})`],
-                  ...porSemestre.map((g) => [String(g.semestre), `${g.etiqueta} (${g.total_registros})`]),
+                  ...porSemestre.map((g) => [
+                    String(g.semestre),
+                    `${g.etiqueta} (${g.disponibles && g.disponibles > g.total_registros ? `${g.total_registros} de ${g.disponibles}` : g.total_registros})`,
+                  ]),
                   ["comparar", "Comparar 1.º y 8.º"],
                 ] as [Muestra, string][]
               ).map(([id, texto]) => (
@@ -537,6 +578,12 @@ export const JamoviAnalyticsView: React.FC<{ historial: HistorialLocal }> = ({ h
                 </button>
               ))}
             </div>
+            <PersonasPorSemestre
+              grupos={porSemestre.map((g) => ({ semestre: g.semestre, etiqueta: g.etiqueta, disponibles: g.disponibles ?? g.total_registros }))}
+              limites={limites}
+              onCambio={cambiarLimite}
+              onCambiarTodos={guardarLimites}
+            />
             {!!datosTodos.sin_semestre && (
               <p className="text-xs text-slate-500">
                 {datosTodos.sin_semestre === 1 ? "1 registro no tiene" : `${datosTodos.sin_semestre} registros no tienen`} semestre 1.º u 8.º:

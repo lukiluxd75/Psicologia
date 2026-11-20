@@ -487,19 +487,30 @@ def sincronizar_historial_sheets(tipo_test: str, payload: RegistrosLocales):
         raise HTTPException(status_code=502, detail=f"No se pudo guardar en Google Sheets: {e}")
 
 
+def _limites(max_1: Optional[int], max_8: Optional[int]) -> dict:
+    """Personas por semestre que entran en las vistas de 1.º, 8.º y la comparación (None = todas)."""
+    return {1: max_1, 8: max_8}
+
+
 @app.get("/api/analytics/{tipo_test}")
-def analitica_sheets(tipo_test: str):
+def analitica_sheets(tipo_test: str, max_1: Optional[int] = None, max_8: Optional[int] = None):
     tipo = _tipo_valido(tipo_test)
     filas = sheets_service.obtener_registros_hoja(tipo)
-    return analytics_service.generar_analitica_jamovi(tipo, filas)
+    return analytics_service.generar_analitica_jamovi(tipo, filas, _limites(max_1, max_8))
 
 
 @app.post("/api/analytics/{tipo_test}/from-local")
-def analitica_local(tipo_test: str, payload: RegistrosLocales, incluir_sheets: bool = False):
+def analitica_local(
+    tipo_test: str,
+    payload: RegistrosLocales,
+    incluir_sheets: bool = False,
+    max_1: Optional[int] = None,
+    max_8: Optional[int] = None,
+):
     """Analiza registros del historial local; con incluir_sheets=true los combina con los de Sheets."""
     tipo = _tipo_valido(tipo_test)
     filas = (sheets_service.obtener_registros_hoja(tipo) if incluir_sheets else []) + payload.registros
-    return analytics_service.generar_analitica_jamovi(tipo, filas)
+    return analytics_service.generar_analitica_jamovi(tipo, filas, _limites(max_1, max_8))
 
 
 @app.get("/api/export/jamovi/{tipo_test}")
