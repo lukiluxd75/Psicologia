@@ -232,22 +232,89 @@ def descriptivas(valores: list[float]) -> dict:
     }
 
 
-def t_welch(a: list[float], b: list[float]) -> dict | None:
-    """t de Welch (la opción de Jamovi cuando no se asumen varianzas iguales) y d de Cohen."""
+def _p_exacta_u(u: float, n1: int, n2: int) -> float:
+    """
+    p bilateral exacta de la U de Mann-Whitney (sin empates), como `wilcox.test` de R.
+    cuentas[k] = de cuántas formas se obtiene U = k, por la recurrencia f(m, n) = f(m−1, n) + f(m, n−1).
+    """
+    # tabla[m][n] = lista de frecuencias de U para tamaños m y n
+    tabla = [[None] * (n2 + 1) for _ in range(n1 + 1)]
+    for m in range(n1 + 1):
+        for n in range(n2 + 1):
+            if m == 0 or n == 0:
+                tabla[m][n] = [1]
+                continue
+            a, b = tabla[m - 1][n], tabla[m][n - 1]
+            cuentas = [0] * (m * n + 1)
+            for k, c in enumerate(a):
+                cuentas[k + n] += c  # el último elemento del primer grupo supera a los n del segundo
+            for k, c in enumerate(b):
+                cuentas[k] += c
+            tabla[m][n] = cuentas
+    cuentas = tabla[n1][n2]
+    total = sum(cuentas)
+    k = int(round(u))
+    if u > n1 * n2 / 2:
+        p = sum(cuentas[k:]) / total
+    else:
+        p = sum(cuentas[: k + 1]) / total
+    return min(1.0, 2 * p)
+
+
+def mann_whitney(a: list[float], b: list[float]) -> dict | None:
+    """
+    U de Mann-Whitney del primer grupo (la W que informan R y Jamovi). p exacta si no hay empates
+    y ambos grupos tienen menos de 50 casos; si no, aproximación normal con corrección por empates
+    y por continuidad (los valores por defecto de `wilcox.test`).
+    """
+    n1, n2 = len(a), len(b)
+    if n1 == 0 or n2 == 0:
+        return None
+    rangos = _rangos(a + b)
+    u = sum(rangos[:n1]) - n1 * (n1 + 1) / 2
+    hay_empates = len(set(a + b)) < n1 + n2
+    if not hay_empates and n1 < 50 and n2 < 50:
+        return {"u": round(u, 1), "p_u": _p_exacta_u(u, n1, n2), "metodo_u": "exacta"}
+    n = n1 + n2
+    repeticiones: dict[float, int] = {}
+    for v in a + b:
+        repeticiones[v] = repeticiones.get(v, 0) + 1
+    empates = sum(t ** 3 - t for t in repeticiones.values())
+    sigma = math.sqrt(n1 * n2 / 12 * ((n + 1) - empates / (n * (n - 1))))
+    if sigma == 0:
+        return {"u": round(u, 1), "p_u": None, "metodo_u": "aproximación normal"}
+    z = u - n1 * n2 / 2
+    z = (z - math.copysign(0.5, z) if z else 0.0) / sigma
+    return {"u": round(u, 1), "p_u": p_normal_bilateral(z), "metodo_u": "aproximación normal"}
+
+
+def comparar_grupos(a: list[float], b: list[float]) -> dict | None:
+    """
+    Compara dos grupos independientes como la prueba t para muestras independientes de Jamovi:
+    t de Student (varianzas iguales), t de Welch, U de Mann-Whitney y d de Cohen.
+    """
     if len(a) < 2 or len(b) < 2:
         return None
     ma, mb = statistics.fmean(a), statistics.fmean(b)
     va, vb = statistics.variance(a), statistics.variance(b)
     na, nb = len(a), len(b)
-    se2 = va / na + vb / nb
-    if se2 == 0:
-        return None
-    t = (ma - mb) / math.sqrt(se2)
-    gl = se2 ** 2 / ((va / na) ** 2 / (na - 1) + (vb / nb) ** 2 / (nb - 1))
+    salida: dict[str, Any] = {"diferencia": round(ma - mb, 2), "t": None, "gl": None, "p": None,
+                              "t_welch": None, "gl_welch": None, "p_welch": None, "d": None}
+
     de_comb = math.sqrt(((na - 1) * va + (nb - 1) * vb) / (na + nb - 2))
-    d = (ma - mb) / de_comb if de_comb else None
-    return {"t": round(t, 3), "gl": round(gl, 2), "p": p_t_bilateral(t, gl),
-            "diferencia": round(ma - mb, 2), "d": None if d is None else round(d, 2)}
+    if de_comb:
+        t = (ma - mb) / (de_comb * math.sqrt(1 / na + 1 / nb))
+        gl = na + nb - 2
+        salida.update(t=round(t, 3), gl=gl, p=p_t_bilateral(t, gl), d=round((ma - mb) / de_comb, 2))
+
+    se2 = va / na + vb / nb
+    if se2:
+        t_w = (ma - mb) / math.sqrt(se2)
+        gl_w = se2 ** 2 / ((va / na) ** 2 / (na - 1) + (vb / nb) ** 2 / (nb - 1))
+        salida.update(t_welch=round(t_w, 3), gl_welch=round(gl_w, 2), p_welch=p_t_bilateral(t_w, gl_w))
+
+    salida.update(mann_whitney(a, b) or {"u": None, "p_u": None, "metodo_u": None})
+    return salida
 
 
 def comparar_correlaciones(r1: float | None, n1: int, r2: float | None, n2: int) -> dict | None:
@@ -504,11 +571,15 @@ def matriz_correlacion(personas: list[dict], etiqueta: str, semestre: int | None
             pares = [(p[vi["clave"]], p[vj["clave"]]) for p in personas
                      if p.get(vi["clave"]) is not None and p.get(vj["clave"]) is not None]
             n = len(pares)
-            r = _pearson_r([a for a, _ in pares], [b for _, b in pares])
+            x, y = [a for a, _ in pares], [b for _, b in pares]
+            r = _pearson_r(x, y)
+            rho = _pearson_r(_rangos(x), _rangos(y)) if n >= 3 else None
             fila.append({
                 "n": n,
                 "r": None if r is None else round(r, 3),
                 "p": None if r is None else round(_p_de_r(r, n), 4),
+                "rho": None if rho is None else round(rho, 3),
+                "p_rho": None if rho is None else round(_p_de_r(rho, n), 4),
             })
         celdas.append(fila)
     return {"semestre": semestre, "etiqueta": etiqueta, "n": len(personas), "variables": variables, "celdas": celdas}
@@ -539,8 +610,8 @@ def generar_correlacion(filas_audit: list[dict], filas_brief: list[dict], semest
         "semestre_b": semestre_b,
         "n_a": len(ga),
         "n_b": len(gb),
-        "audit": _limpiar_p(t_welch([p["audit"] for p in ga], [p["audit"] for p in gb])),
-        "brief": _limpiar_p(t_welch([p["total_general"] for p in ga], [p["total_general"] for p in gb])),
+        "audit": _limpiar_p(comparar_grupos([p["audit"] for p in ga], [p["audit"] for p in gb])),
+        "brief": _limpiar_p(comparar_grupos([p["total_general"] for p in ga], [p["total_general"] for p in gb])),
         "correlaciones": _limpiar_p(comparar_correlaciones(corr_a["r"], len(ga), corr_b["r"], len(gb))),
     }
 

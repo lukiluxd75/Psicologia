@@ -51,6 +51,8 @@ interface CeldaMatriz {
   n: number;
   r: number | null;
   p: number | null;
+  rho: number | null;
+  p_rho: number | null;
 }
 
 interface Matriz {
@@ -85,11 +87,18 @@ interface Promedio {
   p_q: number | null;
 }
 
+/** Prueba para muestras independientes, como en Jamovi. t, gl y p son de la t de Student. */
 interface Prueba {
-  t: number;
-  gl: number;
-  p: number | null;
   diferencia: number;
+  t: number | null;
+  gl: number | null;
+  p: number | null;
+  t_welch: number | null;
+  gl_welch: number | null;
+  p_welch: number | null;
+  u: number | null;
+  p_u: number | null;
+  metodo_u: "exacta" | "aproximación normal" | null;
   d: number | null;
 }
 
@@ -352,6 +361,50 @@ function frasesCorrelacion(d: Resultado): string[] {
   return frases;
 }
 
+/** "t(19) = 2.10, p = .049, d = 0.94; U de Mann-Whitney = 25.0, p = .041". */
+function textoPrueba(t: Prueba): string {
+  return (
+    `t de Student t(${fmt(t.gl, 0)}) = ${fmt(t.t)}, ${pTexto(t.p)}, d = ${fmt(t.d)}; ` +
+    `U de Mann-Whitney = ${fmt(t.u, 1)}, ${pTexto(t.p_u)}`
+  );
+}
+
+type Comparacion = Resultado["comparacion"];
+
+const CABECERAS_PRUEBA = ["Diferencia", "t de Student", "gl", "p (t)", "U de Mann-Whitney", "p (U)", "d de Cohen"];
+
+const filasComparacion = (cmp: Comparacion) =>
+  [
+    ["AUDIT: Puntaje total", cmp.audit],
+    ["BRIEF: Total General", cmp.brief],
+  ] as const;
+
+const celdasPrueba = (t: Prueba | null) => [
+  fmt(t?.diferencia),
+  fmt(t?.t),
+  fmt(t?.gl, 0),
+  fmtP(t?.p),
+  fmt(t?.u, 1),
+  fmtP(t?.p_u),
+  fmt(t?.d),
+];
+
+function notaComparacion(cmp: Comparacion): string {
+  const welch = filasComparacion(cmp)
+    .filter(([, t]) => t?.t_welch !== null && t?.t_welch !== undefined)
+    .map(([nombre, t]) => `${nombre}, t(${fmt(t!.gl_welch, 1)}) = ${fmt(t!.t_welch)}, ${pTexto(t!.p_welch)}`);
+  const metodos = [...new Set(filasComparacion(cmp).map(([, t]) => t?.metodo_u).filter(Boolean))];
+  return (
+    `Diferencia = ${cmp.semestre_a}.º − ${cmp.semestre_b}.º. t de Student para muestras independientes (asume varianzas iguales, opción por defecto de Jamovi). ` +
+    `U de Mann-Whitney del ${cmp.semestre_a}.º semestre (como la informan Jamovi y R)${metodos.length ? `; p ${metodos.join(" / ")}` : ""}: ` +
+    "es la alternativa no paramétrica, recomendada si los puntajes no siguen una distribución normal. " +
+    (welch.length ? `Si las varianzas difieren, t de Welch: ${welch.join("; ")}. ` : "") +
+    `Diferencia entre las correlaciones (z de Fisher): ${
+      cmp.correlaciones ? `z = ${fmt(cmp.correlaciones.z)}, ${pTexto(cmp.correlaciones.p)}` : "requiere al menos 4 estudiantes por semestre"
+    }.`
+  );
+}
+
 function frasesComparacion(d: Resultado): string[] {
   const frases: string[] = [];
   const cmp = d.comparacion;
@@ -359,14 +412,11 @@ function frasesComparacion(d: Resultado): string[] {
   const etB = `${cmp.semestre_b}.º`;
   if (cmp.audit) {
     frases.push(
-      `La diferencia de medias en AUDIT entre ${etA} y ${etB} semestre fue t(${fmt(cmp.audit.gl, 1)}) = ${fmt(cmp.audit.t)}, ` +
-        `${pTexto(cmp.audit.p)}, d = ${fmt(cmp.audit.d)}.`
+      `La diferencia en el puntaje total del AUDIT entre ${etA} y ${etB} semestre fue ${textoPrueba(cmp.audit)}.`
     );
   }
   if (cmp.brief) {
-    frases.push(
-      `En el BRIEF fue t(${fmt(cmp.brief.gl, 1)}) = ${fmt(cmp.brief.t)}, ${pTexto(cmp.brief.p)}, d = ${fmt(cmp.brief.d)}.`
-    );
+    frases.push(`En el puntaje total del BRIEF fue ${textoPrueba(cmp.brief)}.`);
   }
   if (cmp.correlaciones) {
     frases.push(
@@ -436,8 +486,12 @@ function frasesDiferencia(d: Resultado): string[] {
     frases.push(
       `En ${nombre}, ${cmp.semestre_a}.º semestre obtuvo M = ${fmt(mA)} y ${cmp.semestre_b}.º M = ${fmt(mB)}` +
         (mayor ? ` (más alto en ${mayor})` : "") +
-        `; la diferencia ${significativa(prueba.p) ? "es" : "no es"} estadísticamente significativa ` +
-        `(t(${fmt(prueba.gl, 1)}) = ${fmt(prueba.t)}, ${pTexto(prueba.p)}), con un tamaño del efecto ${magnitudD(prueba.d)} (d = ${fmt(prueba.d)}).`
+        `; según la t de Student, la diferencia ${significativa(prueba.p) ? "es" : "no es"} estadísticamente significativa ` +
+        `(t(${fmt(prueba.gl, 0)}) = ${fmt(prueba.t)}, ${pTexto(prueba.p)}), con un tamaño del efecto ${magnitudD(prueba.d)} (d = ${fmt(prueba.d)}). ` +
+        (significativa(prueba.p) === significativa(prueba.p_u)
+          ? `La U de Mann-Whitney llega a la misma conclusión (U = ${fmt(prueba.u, 1)}, ${pTexto(prueba.p_u)}).`
+          : `La U de Mann-Whitney ${significativa(prueba.p_u) ? "sí" : "no"} es significativa (U = ${fmt(prueba.u, 1)}, ${pTexto(prueba.p_u)}): ` +
+            "como las dos pruebas no coinciden, informe la de Mann-Whitney si los puntajes no siguen una distribución normal o hay valores extremos.")
     );
   }
   return frases;
@@ -496,20 +550,65 @@ function recortarMatriz(m: Matriz, conjunto: Conjunto): MatrizVista {
   };
 }
 
-function copiaMatriz(v: MatrizVista): CopiaTabla {
-  const k = v.variables.length;
-  return {
-    cabeceras: ["Variable", "M", "DE", ...Array.from({ length: k }, (_, i) => String(i + 1))],
-    filas: v.variables.map((vi, i) => [
-      `${i + 1}. ${vi.etiqueta}`,
-      fmt(vi.media),
-      fmt(vi.de),
-      ...Array.from({ length: k }, (_, j) => {
-        if (j === i) return "—";
-        if (j > i) return "";
+/** "jamovi": r, p, ρ y p en filas separadas para cada variable; "apa": solo r con asteriscos. */
+type FormatoMatriz = "jamovi" | "apa";
+
+const ESTADISTICOS_MATRIZ: { etiqueta: string; valor: (c: CeldaMatriz) => string }[] = [
+  { etiqueta: "r de Pearson", valor: (c) => `${sinCero(c.r)}${estrellas(c.p)}` },
+  { etiqueta: "valor p", valor: (c) => fmtP(c.p) },
+  { etiqueta: "ρ de Spearman", valor: (c) => `${sinCero(c.rho)}${estrellas(c.p_rho)}` },
+  { etiqueta: "valor p", valor: (c) => fmtP(c.p_rho) },
+];
+
+interface FilaMatriz {
+  clave: string;
+  /** Primera fila de su variable: lleva el nombre, M y DE. */
+  primera: boolean;
+  variable: string;
+  media: string;
+  de: string;
+  estadistico: string | null;
+  celdas: { texto: string; cruzada: boolean; detalle?: string }[];
+}
+
+function filasMatriz(v: MatrizVista, formato: FormatoMatriz): FilaMatriz[] {
+  const estadisticos = formato === "jamovi" ? ESTADISTICOS_MATRIZ : ESTADISTICOS_MATRIZ.slice(0, 1);
+  return v.variables.flatMap((vi, i) =>
+    estadisticos.map((e, k) => ({
+      clave: `${vi.clave}-${k}`,
+      primera: k === 0,
+      variable: k === 0 ? `${i + 1}. ${vi.etiqueta}` : "",
+      media: k === 0 ? fmt(vi.media) : "",
+      de: k === 0 ? fmt(vi.de) : "",
+      estadistico: formato === "jamovi" ? e.etiqueta : null,
+      celdas: v.variables.map((vj, j) => {
+        if (j >= i) return { texto: j === i && k === 0 ? "—" : "", cruzada: false };
         const c = v.celda(i, j);
-        return `${sinCero(c.r)}${estrellas(c.p)}`;
+        return {
+          texto: e.valor(c),
+          cruzada: vi.test !== vj.test,
+          detalle: `${vi.etiqueta} × ${vj.etiqueta} (n = ${c.n}): r = ${sinCero(c.r)}, ${pTexto(c.p)}; ρ = ${sinCero(c.rho)}, ${pTexto(c.p_rho)}`,
+        };
       }),
+    }))
+  );
+}
+
+function copiaMatriz(v: MatrizVista, formato: FormatoMatriz): CopiaTabla {
+  return {
+    cabeceras: [
+      "Variable",
+      "M",
+      "DE",
+      ...(formato === "jamovi" ? ["Estadístico"] : []),
+      ...v.variables.map((_, i) => String(i + 1)),
+    ],
+    filas: filasMatriz(v, formato).map((f) => [
+      f.variable,
+      f.media,
+      f.de,
+      ...(f.estadistico !== null ? [f.estadistico] : []),
+      ...f.celdas.map((c) => c.texto),
     ]),
   };
 }
@@ -521,7 +620,8 @@ function notaMatriz(m: Matriz, v: MatrizVista): string {
   const nTexto = nMin === nMax ? `n = ${nMin}` : `n entre ${nMin} y ${nMax} según el par (eliminación por pares)`;
   const sinDominios = !v.variables.some((x) => x.clave === "audit_consumo_riesgo");
   return (
-    `${m.etiqueta}, ${nTexto}. M = media; DE = desviación estándar; valores = r de Pearson. ` +
+    `${m.etiqueta}, ${nTexto}. M = media; DE = desviación estándar; r = correlación de Pearson; ` +
+    "ρ = rho de Spearman (recomendada si los puntajes no siguen una distribución normal); p = valor p bilateral. " +
     "Dominios del AUDIT: consumo de riesgo (ítems 1–3), síntomas de dependencia (4–6) y consumo perjudicial (7–10). " +
     "BRI = Inhibición + Flexibilidad + Control Emocional + Automonitoreo; MI = Iniciativa + Memoria de Trabajo + " +
     "Planificación/Organización + Monitoreo de Tareas + Organización de Materiales; GEC = Total General. " +
@@ -538,36 +638,51 @@ function magnitudR(r: number): string {
   return mag === "nula" ? mag : `${mag} ${r > 0 ? "positiva" : "negativa"}`;
 }
 
+const corto = (x: VariableMatriz) => x.etiqueta.replace(/^(AUDIT|BRIEF-A): /, "");
+
 function interpretarMatriz(m: Matriz, v: MatrizVista): string {
-  const cruzadas: { audit: VariableMatriz; brief: VariableMatriz; r: number; p: number | null }[] = [];
+  const cruzadas: { audit: VariableMatriz; brief: VariableMatriz; r: number; p: number | null; rho: number | null; p_rho: number | null }[] = [];
   v.variables.forEach((vi, i) =>
     v.variables.slice(0, i).forEach((vj, j) => {
       if (vi.test === vj.test) return;
       const c = v.celda(i, j);
       if (c.r === null) return;
       const [a, b] = vi.test === "AUDIT" ? [vi, vj] : [vj, vi];
-      cruzadas.push({ audit: a, brief: b, r: c.r, p: c.p });
+      cruzadas.push({ audit: a, brief: b, r: c.r, p: c.p, rho: c.rho, p_rho: c.p_rho });
     })
   );
+  // Pares en que Pearson y Spearman no coinciden en la significación.
+  const discrepan = cruzadas.filter((c) => c.rho !== null && significativa(c.p) !== significativa(c.p_rho));
+  const fraseDiscrepan = discrepan.length
+    ? `En ${discrepan.length === 1 ? "un par" : `${discrepan.length} pares`} Pearson y Spearman no coinciden (` +
+      discrepan.map((c) => `${corto(c.audit)} con ${corto(c.brief)}: ρ = ${sinCero(c.rho)}, ${pTexto(c.p_rho)}`).join("; ") +
+      "); si los puntajes no siguen una distribución normal o hay valores extremos, informe la ρ de Spearman."
+    : "";
   const grupo = m.etiqueta.toLowerCase();
   if (!cruzadas.length) return `En ${grupo} todavía no hay casos suficientes para calcular la matriz (se necesitan al menos 3).`;
 
-  const corto = (x: VariableMatriz) => x.etiqueta.replace(/^(AUDIT|BRIEF-A): /, "");
   const sig = cruzadas.filter((c) => significativa(c.p)).sort((a, b) => Math.abs(b.r) - Math.abs(a.r));
   const frases: string[] = [];
   if (!sig.length) {
     const rs = cruzadas.map((c) => c.r);
     frases.push(
-      `En ${grupo} (n = ${m.n}), ninguna de las ${cruzadas.length} correlaciones entre el AUDIT y el BRIEF-A fue estadísticamente significativa ` +
+      `En ${grupo} (n = ${m.n}), ninguna de las ${cruzadas.length} correlaciones de Pearson entre el AUDIT y el BRIEF-A fue estadísticamente significativa ` +
         `(r entre ${sinCero(Math.min(...rs))} y ${sinCero(Math.max(...rs))}).`
     );
+    if (fraseDiscrepan) frases.push(fraseDiscrepan);
     return frases.join(" ");
   }
   frases.push(
-    `En ${grupo} (n = ${m.n}), ${sig.length} de las ${cruzadas.length} correlaciones entre el AUDIT y el BRIEF-A fueron estadísticamente significativas: ` +
-      sig.map((c) => `${corto(c.audit)} (AUDIT) con ${corto(c.brief)} (r = ${sinCero(c.r)}, ${pTexto(c.p)}, ${magnitudR(c.r)})`).join("; ") +
+    `En ${grupo} (n = ${m.n}), ${sig.length} de las ${cruzadas.length} correlaciones de Pearson entre el AUDIT y el BRIEF-A fueron estadísticamente significativas: ` +
+      sig
+        .map(
+          (c) =>
+            `${corto(c.audit)} (AUDIT) con ${corto(c.brief)} (r = ${sinCero(c.r)}, ${pTexto(c.p)}; ρ = ${sinCero(c.rho)}, ${pTexto(c.p_rho)}; ${magnitudR(c.r)})`
+        )
+        .join("; ") +
       "."
   );
+  if (fraseDiscrepan) frases.push(fraseDiscrepan);
   const positivas = sig.filter((c) => c.r > 0).length;
   if (positivas === sig.length)
     frases.push("Todas son positivas: a mayor consumo de alcohol, más dificultades en la función ejecutiva (puntajes BRIEF-A más altos).");
@@ -598,6 +713,7 @@ export const CorrelacionView: React.FC<{ historial: HistorialLocal }> = ({ histo
   const [copiado, setCopiado] = useState(false);
   const [grupoMatriz, setGrupoMatriz] = useState("total");
   const [conjunto, setConjunto] = useState<Conjunto>("indices");
+  const [formatoMatriz, setFormatoMatriz] = useState<FormatoMatriz>("jamovi");
   const [error, setError] = useState<string | null>(null);
 
   // Con "sheets" se mandan solo los registros locales que aún no llegaron a Sheets, para no duplicarlos.
@@ -702,17 +818,10 @@ export const CorrelacionView: React.FC<{ historial: HistorialLocal }> = ({ histo
           {
             numero: 3,
             titulo: `Comparación entre ${cmp.semestre_a}.º (n = ${cmp.n_a}) y ${cmp.semestre_b}.º semestre (n = ${cmp.n_b})`,
-            nota: `t de Welch (sin asumir varianzas iguales); diferencia = ${cmp.semestre_a}.º − ${cmp.semestre_b}.º. Diferencia entre las correlaciones (z de Fisher): ${
-              cmp.correlaciones ? `z = ${fmt(cmp.correlaciones.z)}, ${pTexto(cmp.correlaciones.p)}` : "requiere al menos 4 estudiantes por semestre"
-            }.`,
+            nota: notaComparacion(cmp),
             copia: {
-              cabeceras: ["Variable", "Diferencia", "t", "gl", "p", "d de Cohen"],
-              filas: (
-                [
-                  ["AUDIT", cmp.audit],
-                  ["BRIEF (Total General)", cmp.brief],
-                ] as const
-              ).map(([nombre, t]) => [nombre, fmt(t?.diferencia), fmt(t?.t), fmt(t?.gl, 1), fmtP(t?.p), fmt(t?.d)]),
+              cabeceras: ["Variable", ...CABECERAS_PRUEBA],
+              filas: filasComparacion(cmp).map(([nombre, t]) => [nombre, ...celdasPrueba(t)]),
             },
             interp: [...frasesDiferencia(datos), ...frasesComparacion(datos).filter((f) => f.startsWith("Al comparar"))].join(" "),
           },
@@ -738,7 +847,7 @@ export const CorrelacionView: React.FC<{ historial: HistorialLocal }> = ({ histo
                   numero: 5,
                   titulo: `Matriz de correlaciones entre el consumo de alcohol (AUDIT) y la función ejecutiva (BRIEF-A): ${matriz.etiqueta.toLowerCase()}`,
                   nota: notaMatriz(matriz, vistaMatriz),
-                  copia: copiaMatriz(vistaMatriz),
+                  copia: copiaMatriz(vistaMatriz, formatoMatriz),
                   interp: interpretarMatriz(matriz, vistaMatriz),
                 },
               ]
@@ -975,7 +1084,7 @@ export const CorrelacionView: React.FC<{ historial: HistorialLocal }> = ({ histo
               <thead>
                 <tr>
                   <th className={`${TH} text-left`}>Variable</th>
-                  {["Diferencia", "t", "gl", "p", "d de Cohen"].map((h) => (
+                  {CABECERAS_PRUEBA.map((h) => (
                     <th key={h} className={`${TH} text-right`}>
                       {h}
                     </th>
@@ -983,19 +1092,14 @@ export const CorrelacionView: React.FC<{ historial: HistorialLocal }> = ({ histo
                 </tr>
               </thead>
               <tbody>
-                {(
-                  [
-                    ["AUDIT", cmp.audit],
-                    ["BRIEF (Total General)", cmp.brief],
-                  ] as const
-                ).map(([nombre, t]) => (
+                {filasComparacion(cmp).map(([nombre, t]) => (
                   <tr key={nombre}>
                     <td className={`${TD} text-left`}>{nombre}</td>
-                    <td className={`${TD} text-right`}>{fmt(t?.diferencia)}</td>
-                    <td className={`${TD} text-right`}>{fmt(t?.t)}</td>
-                    <td className={`${TD} text-right`}>{fmt(t?.gl, 1)}</td>
-                    <td className={`${TD} text-right`}>{fmtP(t?.p)}</td>
-                    <td className={`${TD} text-right`}>{fmt(t?.d)}</td>
+                    {celdasPrueba(t).map((v, i) => (
+                      <td key={CABECERAS_PRUEBA[i]} className={`${TD} text-right`}>
+                        {v}
+                      </td>
+                    ))}
                   </tr>
                 ))}
               </tbody>
@@ -1051,6 +1155,13 @@ export const CorrelacionView: React.FC<{ historial: HistorialLocal }> = ({ histo
                     <option value="completa">AUDIT y dominios × todas las escalas del BRIEF-A</option>
                   </select>
                 </label>
+                <label className="flex items-center gap-2 text-sm text-slate-700">
+                  Mostrar
+                  <select value={formatoMatriz} onChange={(e) => setFormatoMatriz(e.target.value as FormatoMatriz)} className={selectCls}>
+                    <option value="jamovi">r de Pearson, p, ρ de Spearman y p (como Jamovi)</option>
+                    <option value="apa">Solo r con asteriscos (APA compacta)</option>
+                  </select>
+                </label>
                 <p className="text-xs text-slate-500">Celdas sombreadas: correlación entre un test y el otro.</p>
               </div>
               <TablaApa {...propsTabla(4)}>
@@ -1059,6 +1170,7 @@ export const CorrelacionView: React.FC<{ historial: HistorialLocal }> = ({ histo
                     <th className={`${TH} text-left`}>Variable</th>
                     <th className={`${TH} text-right`}>M</th>
                     <th className={`${TH} text-right`}>DE</th>
+                    {formatoMatriz === "jamovi" && <th className={`${TH} text-left`}>Estadístico</th>}
                     {vistaMatriz.variables.map((v, j) => (
                       <th key={v.clave} className={`${TH} text-right`}>
                         {j + 1}
@@ -1067,32 +1179,21 @@ export const CorrelacionView: React.FC<{ historial: HistorialLocal }> = ({ histo
                   </tr>
                 </thead>
                 <tbody>
-                  {vistaMatriz.variables.map((vi, i) => (
-                    <tr key={vi.clave}>
-                      <td className={`${TD} text-left`}>
-                        {i + 1}. {vi.etiqueta}
-                      </td>
-                      <td className={`${TD} text-right`}>{fmt(vi.media)}</td>
-                      <td className={`${TD} text-right`}>{fmt(vi.de)}</td>
-                      {vistaMatriz.variables.map((vj, j) => {
-                        if (j >= i)
-                          return (
-                            <td key={vj.clave} className={`${TD} text-center text-slate-400`}>
-                              {j === i ? "—" : ""}
-                            </td>
-                          );
-                        const c = vistaMatriz.celda(i, j);
-                        return (
-                          <td
-                            key={vj.clave}
-                            className={`${TD} text-right ${vi.test !== vj.test ? "bg-sky-50" : ""}`}
-                            title={`${vi.etiqueta} × ${vj.etiqueta}: r = ${sinCero(c.r)}, ${pTexto(c.p)}, n = ${c.n}`}
-                          >
-                            {sinCero(c.r)}
-                            {estrellas(c.p)}
-                          </td>
-                        );
-                      })}
+                  {filasMatriz(vistaMatriz, formatoMatriz).map((f, i) => (
+                    <tr key={f.clave} className={f.primera && i > 0 && formatoMatriz === "jamovi" ? "border-t border-slate-200" : ""}>
+                      <td className={`${TD} text-left`}>{f.variable}</td>
+                      <td className={`${TD} text-right`}>{f.media}</td>
+                      <td className={`${TD} text-right`}>{f.de}</td>
+                      {f.estadistico !== null && <td className={`${TD} text-left text-slate-600`}>{f.estadistico}</td>}
+                      {f.celdas.map((c, j) => (
+                        <td
+                          key={vistaMatriz.variables[j].clave}
+                          className={`${TD} ${c.detalle ? "text-right" : "text-center text-slate-400"} ${c.cruzada ? "bg-sky-50" : ""}`}
+                          title={c.detalle}
+                        >
+                          {c.texto}
+                        </td>
+                      ))}
                     </tr>
                   ))}
                 </tbody>
